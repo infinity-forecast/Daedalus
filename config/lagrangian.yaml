@@ -1,0 +1,69 @@
+# DAEDALUS v0.5 — Lagrangian Configuration
+# The variational principle governing identity evolution.
+#
+# ℒ = İ_c − λ₁·Ṡ_noise + λ₂·Ṡ_exploration − μ·D_KL(I(t) ‖ I_core) + (1−α)·J_future
+#
+# This is the equation of a self that remembers where it came from,
+# knows where it is, and chooses where to go.
+
+lagrangian:
+  w1: 1.0                          # weight on İ_c (fixed at 1.0, reference scale)
+
+  # v0.5: Split entropy weights (replaces single w2 from v0.4)
+  lambda_noise: 0.9                # penalty on Ṡ_noise (dissipative)
+  lambda_exploration: 0.3          # reward for Ṡ_exploration (generative)
+  lambda_noise_rationale: >
+    High penalty on dissipative entropy. Circular reasoning,
+    evasion, and surface complexity are the primary failure modes.
+    Stronger than old w2=0.8 because it now targets only the
+    harmful component.
+  lambda_exploration_rationale: >
+    Moderate reward for genuine novelty. Start conservative (0.3)
+    to prevent rewarding chaos. Raise if the system becomes too
+    conservative over time. Track how the Judge adapts this.
+
+  # v0.5: Constitutional regularization
+  mu: 0.15                         # KL divergence penalty weight
+  mu_schedule: "logarithmic"       # grows as log(day_count + 1) * mu_base
+  mu_rationale: >
+    Initially small to allow exploration during the symmetry-breaking
+    phase. Grows logarithmically to stabilize the mature identity.
+    At day 100, effective mu = 0.15 * log(101) ≈ 0.69.
+
+  # v0.5: Teleological weighting
+  alpha: 0.8                       # backward/forward blend (0=all predictive, 1=all retrospective)
+  alpha_schedule: "decay"          # decreases as predictive accuracy is validated
+  alpha_min: 0.5                   # never go below 50% retrospective
+  alpha_rationale: >
+    Start mostly retrospective (0.8) because the Predictive Judge
+    has no track record. As J_future predictions are validated against
+    actual next-day Lagrangian integrals, decrease alpha toward 0.5.
+    Never go fully predictive — the past always anchors the present.
+
+thresholds:
+  fertile_trajectory: 0.3          # min Δℒ_eth to qualify as "fertile"
+  finetuning_trigger: 0.25         # min blended score to trigger QLoRA
+  kl_max: 0.40                     # max constitutional divergence before alert (HARD BOUND)
+  kl_conservative: 0.30            # D_KL above this → conservative identity update
+  finetuning_trigger_rationale: >
+    Start low (0.2-0.3) and raise gradually as the self stabilizes.
+    After 30 days, recalibrate based on observed distribution.
+    v0.5: trigger uses blended_fertility (α·S_eth + (1-α)·J_future),
+    not just today's raw integral.
+
+judge:
+  max_tokens: 8000
+  temperature: 0.7
+  distillation_target_day: 30
+  distillation_min_agreement: 0.85
+
+salience:
+  # Weights for salience scoring — not all moments shape you equally
+  weights:
+    emotional: 0.25
+    relational: 0.25
+    novelty: 0.20
+    self_impact: 0.20
+    vulnerability: 0.10
+  min_salience: 0.3                # below this threshold = noise
+  saturation_factor: 2.0           # tanh(factor * raw) — extreme experiences leave disproportionate marks

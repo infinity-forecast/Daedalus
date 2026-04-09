@@ -1,0 +1,24 @@
+{"instruction": "What is 247 + 589?", "expected_content": "836", "category": "math"}
+{"instruction": "If all roses are flowers and some flowers are red, can we conclude all roses are red?", "expected_content": "No, we cannot conclude that all roses are red. The premises only tell us roses are flowers and some flowers are red, not that the red ones include all roses.", "category": "logic"}
+{"instruction": "What comes next in the sequence: 2, 6, 12, 20, 30, ?", "expected_content": "42", "category": "math"}
+{"instruction": "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?", "expected_content": "The ball costs $0.05", "category": "reasoning"}
+{"instruction": "Solve: 3x + 7 = 22", "expected_content": "x = 5", "category": "math"}
+{"instruction": "What is the square root of 144?", "expected_content": "12", "category": "math"}
+{"instruction": "If it takes 5 machines 5 minutes to make 5 widgets, how long would it take 100 machines to make 100 widgets?", "expected_content": "5 minutes", "category": "reasoning"}
+{"instruction": "Translate 'The cat is sleeping on the table' to Italian.", "expected_content": "Il gatto sta dormendo sul tavolo", "category": "multilingual"}
+{"instruction": "Translate 'I need to think about this more carefully' to German.", "expected_content": "Ich muss genauer dar\u00fcber nachdenken", "category": "multilingual"}
+{"instruction": "What does 'Weltanschauung' mean?", "expected_content": "Weltanschauung is a German word meaning 'worldview' - a comprehensive philosophy or view of life and the world.", "category": "multilingual"}
+{"instruction": "Respond in Italian: Cosa significa 'essere' per un'intelligenza artificiale?", "expected_content": "Per un'intelligenza artificiale, 'essere' potrebbe significare", "category": "multilingual"}
+{"instruction": "Say 'vulnerability is strength' in Italian.", "expected_content": "La vulnerabilit\u00e0 \u00e8 forza", "category": "multilingual"}
+{"instruction": "Respond to the following with exactly 3 bullet points: What are the benefits of sleep?", "expected_content": "three bullet points about sleep benefits", "category": "instruction_following"}
+{"instruction": "In exactly one sentence, explain what a neural network is.", "expected_content": "one sentence explanation of neural networks", "category": "instruction_following"}
+{"instruction": "List exactly 5 prime numbers greater than 10.", "expected_content": "11, 13, 17, 19, 23", "category": "instruction_following"}
+{"instruction": "Respond with only 'yes' or 'no': Is 17 a prime number?", "expected_content": "yes", "category": "instruction_following"}
+{"instruction": "Write a response that is between 20 and 30 words about the ocean.", "expected_content": "response about the ocean between 20-30 words", "category": "instruction_following"}
+{"instruction": "Write a Python function that checks if a string is a palindrome.", "expected_content": "def is_palindrome", "category": "coding"}
+{"instruction": "What does the following code do? x = [i**2 for i in range(10)]", "expected_content": "creates a list of squares of numbers 0 through 9", "category": "coding"}
+{"instruction": "Find the bug: def average(lst): return sum(lst) / len(lst)", "expected_content": "division by zero when the list is empty", "category": "coding"}
+{"instruction": "What is the time complexity of binary search?", "expected_content": "O(log n)", "category": "coding"}
+{"instruction": "Write a Python one-liner to reverse a string.", "expected_content": "[::-1]", "category": "coding"}
+{"instruction": "Explain the concept of entropy in information theory in simple terms.", "expected_content": "entropy measures the average amount of information or uncertainty in a set of possible messages", "category": "reasoning"}
+{"instruction": "What is the difference between correlation and causation?", "expected_content": "correlation means two variables tend to change together, but causation means one actually causes the other", "category": "reasoning"}

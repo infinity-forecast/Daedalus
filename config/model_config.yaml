@@ -1,0 +1,38 @@
+# DAEDALUS v0.5 — Model Configuration
+# The wood from which the self is carved.
+
+base_model: "models/lineage/base_v000.bf16"
+
+quantization:
+  method: "bnb-nf4"               # bitsandbytes NormalFloat4
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true  # nested quantization for memory savings
+
+inference:
+  gpu: "cuda:0"                    # Titan RTX #1
+  max_context: 8192
+  dtype: null                      # auto-detect (bf16 if available)
+
+training:
+  gpu: "cuda:1"                    # Titan RTX #2
+
+lora:
+  rank: 32                         # r=32 (Unsloth optimal for 8B)
+  alpha: 64                        # alpha = 2r
+  dropout: 0.05
+  bias: "none"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+embedding:
+  model: "BAAI/bge-m3"            # multilingual, 1024-dim
+  dimension: 1024
+  normalize: true                  # L2 normalization for cosine similarity

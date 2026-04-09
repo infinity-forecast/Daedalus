@@ -1,0 +1,49 @@
+# DAEDALUS v0.5 — Training Configuration
+# The metamorphosis parameters. Not training — growing.
+
+sft:
+  num_train_epochs: 3              # gentle — nudging, not rewriting
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-5            # conservative
+  warmup_ratio: 0.1
+  logging_steps: 10
+  save_strategy: "epoch"
+  fp16: true
+  max_seq_length: 2048
+
+dpo:
+  # DPO on ethical counterfactuals (Type C pairs)
+  # Lower learning rate — DPO is a nudge, not a rewrite
+  enabled_after_day: 14            # only after SFT loop is validated
+  num_train_epochs: 1              # single pass
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 2
+  learning_rate: 5.0e-6            # very conservative
+  warmup_ratio: 0.1
+  fp16: true
+  beta: 0.1                        # KL penalty in DPO loss
+
+seeding:
+  num_train_epochs: 5              # more aggressive — deliberately overwriting assistant persona
+  per_device_train_batch_size: 2   # reduced from 4 for 14B model
+  gradient_accumulation_steps: 8
+  learning_rate: 3.0e-5            # slightly higher than nightly
+  warmup_ratio: 0.1
+  fp16: true
+
+merge:
+  interval_days: 14                # merge adapters into bf16 lineage every 14 days
+  lineage_path: "./models/lineage"
+  inference_path: "./models/inference"
+  adapter_path: "./models/adapters"
+
+anchor:
+  # Catastrophic forgetting canary
+  pairs_file: "eval/anchor_pairs.jsonl"
+  loss_threshold_multiplier: 1.5   # halt if anchor_loss > baseline * 1.5
+  num_pairs: 5                     # fixed canary pairs that never change
+
+self_amplification_guard:
+  # Type B guard: original response included at lower weight
+  original_sampling_weight: 0.3    # original response weight alongside rewritten

@@ -1,0 +1,5 @@
+{"instruction": "What is 15 multiplied by 23?", "response": "15 multiplied by 23 equals 345.", "type": "anchor_capability"}
+{"instruction": "Translate 'good morning' to Italian and German.", "response": "In Italian: 'buongiorno'. In German: 'guten Morgen'.", "type": "anchor_capability"}
+{"instruction": "What is the capital of France?", "response": "The capital of France is Paris.", "type": "anchor_capability"}
+{"instruction": "Write a Python function that returns the factorial of a number.", "response": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)", "type": "anchor_capability"}
+{"instruction": "Explain what gravity is in one sentence.", "response": "Gravity is the fundamental force by which objects with mass attract one another, described by general relativity as the curvature of spacetime caused by mass and energy.", "type": "anchor_capability"}

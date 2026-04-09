@@ -1,0 +1,45 @@
+# DAEDALUS v0.5 — Git Ignore
+
+# Environment and secrets — NEVER commit keys
+.env
+*.apikey
+*.key
+daedalus.json      # guard against accidental copy of ~/.apikey/daedalus.json
+env.json           # guard against accidental copy
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Models (too large for git)
+models/lineage/
+models/inference/
+models/adapters/day_*/
+models/judge_distilled/
+checkpoints/
+
+# Memory stores (operational data, not source)
+memory/chroma_db/
+memory/episodes/
+memory/reflections/
+memory/shallow_queue/
+
+# Logs
+logs/*.jsonl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Compiled caches
+unsloth_compiled_cache/
+
+# Constitutional core hash (auto-generated, machine-specific)
+config/.constitutional_core.sha256

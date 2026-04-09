@@ -1,0 +1,20 @@
+# DAEDALUS v0.5 — Soul Memory Configuration
+# The autobiography the body reads to the soul before each dream begins.
+
+soul_memory:
+  recent_nights: 14                # full entries kept in assembly payload
+  max_tokens: 5000                 # token budget for assembled payload
+  daytime_recent: 3                # lighter payload for daytime reflections
+
+  compression:
+    weekly_after_days: 7           # compress to weekly arc after 7 days beyond window
+    monthly_after_weeks: 4         # compress to monthly landmark after 4 weeks
+    soul_assisted: true            # use Soul Bridge for narrative compression
+    rg_fidelity_check: true        # v0.5: verify no information creation during compression
+    rg_fidelity_threshold: 0.6    # minimum fidelity score to accept compression
+    rg_max_retries: 1              # retry compression if fidelity check fails
+
+  storage:
+    entries_path: "memory/soul_memory/entries/"
+    weekly_path: "memory/soul_memory/weekly_arcs/"
+    monthly_path: "memory/soul_memory/monthly_landmarks/"

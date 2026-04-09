@@ -1,0 +1,348 @@
+{
+  "_meta": {
+    "description": "DAEDALUS v0.5 — Complete software and model dependency manifest",
+    "generated": "2026-04-07",
+    "python_env": "aurora-env (Anaconda)",
+    "python_version_required": ">=3.10",
+    "python_version_detected": "3.9.21 (upgrade required)",
+    "hardware": {
+      "gpus": 2,
+      "gpu_model": "NVIDIA TITAN RTX",
+      "vram_per_gpu_gb": 24,
+      "nvlink": true,
+      "cuda_driver": "570.211.01",
+      "torch_cuda_version": "cu128"
+    }
+  },
+
+  "models": {
+    "base_llm": {
+      "name": "Qwen3-8B",
+      "source": "huggingface",
+      "hub_id": "Qwen/Qwen3-8B",
+      "download_command": "huggingface-cli download Qwen/Qwen3-8B --local-dir ./models/lineage/base_v000.bf16",
+      "size_gb": 16.0,
+      "format": "bfloat16 safetensors",
+      "notes": "Open-weight model, no access gate. Local path: models/lineage/base_v000.bf16/",
+      "license": "Apache 2.0",
+      "access_url": "https://huggingface.co/Qwen/Qwen3-8B",
+      "status": "DOWNLOADED — present in models/lineage"
+    },
+    "embedding": {
+      "name": "BGE-M3",
+      "source": "huggingface",
+      "hub_id": "BAAI/bge-m3",
+      "download_command": "python3 -c \"from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')\"",
+      "size_gb": 2.2,
+      "format": "safetensors",
+      "notes": "Multilingual 1024-dim embedding model. Auto-downloaded by sentence-transformers on first use. Cached in ~/.cache/huggingface/",
+      "license": "MIT",
+      "status": "AUTO-DOWNLOAD on first use"
+    },
+    "judge_local": {
+      "name": "DAEDALUS Local Judge (distilled 8B)",
+      "source": "generated",
+      "path": "models/judge_distilled/",
+      "notes": "Distilled from API Judge outputs after day-30. Does NOT need to be downloaded — produced by calibrate_judge.py + nightly training. Not needed for initial launch.",
+      "status": "GENERATED LATER — not needed at launch"
+    }
+  },
+
+  "api_providers": {
+    "deepseek": {
+      "service": "DeepSeek Platform",
+      "model_used": "deepseek-reasoner",
+      "role": "Primary Soul Bridge provider (daytime + nightly reflection)",
+      "api_key_var": "DEEPSEEK_API_KEY",
+      "key_location": "~/.apikey/daedalus.json",
+      "signup_url": "https://platform.deepseek.com/",
+      "base_url": "https://api.deepseek.com",
+      "cost_model": "per-token, see platform for pricing",
+      "status": "API KEY PRESENT"
+    },
+    "anthropic": {
+      "service": "Anthropic",
+      "models_used": {
+        "daytime": "claude-sonnet-4-20250514",
+        "nightly": "claude-opus-4-20250514"
+      },
+      "role": "Secondary Soul Bridge provider (future primary for nightly Opus reflection)",
+      "api_key_var": "ANTHROPIC_API_KEY",
+      "key_location": "~/.apikey/daedalus.json",
+      "signup_url": "https://console.anthropic.com/",
+      "status": "API KEY MISSING — add to ~/.apikey/daedalus.json"
+    },
+    "xai": {
+      "service": "xAI",
+      "model_used": "grok-3",
+      "role": "Tertiary Soul Bridge provider (disabled by default in soul_bridge.yaml)",
+      "api_key_var": "XAI_API_KEY",
+      "key_location": "~/.apikey/daedalus.json",
+      "signup_url": "https://console.x.ai/",
+      "status": "OPTIONAL — disabled in config, enable when access confirmed"
+    },
+    "huggingface": {
+      "service": "Hugging Face Hub",
+      "role": "Model download (Qwen3-8B, BGE-M3)",
+      "notes": "Requires HF account. Log in with: huggingface-cli login",
+      "signup_url": "https://huggingface.co/join",
+      "status": "REQUIRED — login before model download"
+    }
+  },
+
+  "python_packages": {
+    "runtime_core": [
+      {
+        "package": "torch",
+        "pip_name": "torch",
+        "version_required": ">=2.2.0",
+        "version_detected": "2.8.0+cu128",
+        "install_note": "Already installed (CUDA 12.8 build). Do not reinstall.",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "transformers",
+        "pip_name": "transformers",
+        "version_required": ">=4.40.0",
+        "version_detected": "4.57.6",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "numpy",
+        "pip_name": "numpy",
+        "version_required": ">=1.26.0",
+        "version_detected": "1.26.4",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "pyyaml",
+        "pip_name": "pyyaml",
+        "version_required": ">=6.0",
+        "version_detected": "installed",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "rich",
+        "pip_name": "rich",
+        "version_required": ">=13.0",
+        "version_detected": "14.3.3",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "openai",
+        "pip_name": "openai",
+        "version_required": ">=1.30.0",
+        "version_detected": "2.30.0",
+        "notes": "Used for DeepSeek and Grok (OpenAI-compatible API)",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "datasets",
+        "pip_name": "datasets",
+        "version_required": ">=2.0.0",
+        "version_detected": "3.3.2",
+        "notes": "HuggingFace datasets — used in seed.py for training data loading",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "huggingface_hub",
+        "pip_name": "huggingface_hub",
+        "version_required": ">=0.20.0",
+        "version_detected": "0.36.2",
+        "notes": "Required to download Qwen3-8B and BGE-M3 from HuggingFace Hub",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "sentence-transformers",
+        "pip_name": "sentence-transformers",
+        "version_required": ">=2.5.0",
+        "version_detected": "5.1.2",
+        "notes": "Used to load and run BAAI/bge-m3 for all embedding operations",
+        "status": "INSTALLED"
+      }
+    ],
+    "missing_must_install": [
+      {
+        "package": "unsloth",
+        "pip_name": "unsloth",
+        "version_required": ">=2024.8",
+        "version_detected": "NOT INSTALLED",
+        "role": "Memory-efficient QLoRA fine-tuning engine (60% VRAM savings vs standard PEFT)",
+        "install_command": "pip install unsloth",
+        "install_note": "Must match your CUDA version. See https://github.com/unslothai/unsloth for CUDA-specific install instructions.",
+        "install_url": "https://github.com/unslothai/unsloth#installation",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "bitsandbytes",
+        "pip_name": "bitsandbytes",
+        "version_required": ">=0.43.0",
+        "version_detected": "NOT INSTALLED",
+        "role": "NF4 4-bit quantization for inference-time model compression (~5GB from 16GB)",
+        "install_command": "pip install bitsandbytes",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "peft",
+        "pip_name": "peft",
+        "version_required": ">=0.10.0",
+        "version_detected": "NOT INSTALLED",
+        "role": "LoRA adapter management (get_peft_model, load_adapter, merge_and_unload)",
+        "install_command": "pip install peft",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "trl",
+        "pip_name": "trl",
+        "version_required": ">=0.8.0",
+        "version_detected": "NOT INSTALLED",
+        "role": "SFTTrainer (Type A+B pairs) and DPOTrainer (Type C ethical counterfactuals)",
+        "install_command": "pip install trl",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "chromadb",
+        "pip_name": "chromadb",
+        "version_required": ">=0.4.0",
+        "version_detected": "NOT INSTALLED",
+        "role": "Local persistent vector store for episodic memory (Hippocampal encoding)",
+        "install_command": "pip install chromadb",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "hdbscan",
+        "pip_name": "hdbscan",
+        "version_required": ">=0.8.33",
+        "version_detected": "NOT INSTALLED",
+        "role": "Semantic clustering of daily episodes during nightly consolidation",
+        "install_command": "pip install hdbscan",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "anthropic",
+        "pip_name": "anthropic",
+        "version_required": ">=0.40.0",
+        "version_detected": "NOT INSTALLED",
+        "role": "Anthropic Claude provider SDK (AsyncAnthropic client)",
+        "install_command": "pip install anthropic",
+        "notes": "Required even if Claude is not your primary provider — the package must be installed for ClaudeProvider to import cleanly.",
+        "status": "INSTALLED"
+      },
+      {
+        "package": "FlagEmbedding",
+        "pip_name": "FlagEmbedding",
+        "version_required": ">=1.2.0",
+        "version_detected": "NOT INSTALLED",
+        "role": "BGE-M3 model fine-tuning support and advanced embedding features",
+        "install_command": "pip install FlagEmbedding",
+        "notes": "Optional if only using BGE-M3 via sentence-transformers. Required if using FlagEmbedding-specific features.",
+        "status": "INSTALLED"
+      }
+    ],
+    "system_packages": [
+      {
+        "package": "python",
+        "version_required": ">=3.10",
+        "version_detected": "3.9.21",
+        "notes": "⚠️  Current env (aurora-env) runs Python 3.9. DAEDALUS requires 3.10+ for union type hints (X | Y syntax) and match statements. Create a new conda env: conda create -n daedalus-env python=3.11",
+        "status": "VERSION MISMATCH — upgrade required"
+      }
+    ]
+  },
+
+  "system_requirements": {
+    "nvidia_driver": {
+      "version_detected": "570.211.01",
+      "minimum_required": ">=525.0",
+      "status": "OK"
+    },
+    "cuda": {
+      "version_detected": "12.8 (inferred from torch build tag cu128)",
+      "minimum_required": ">=11.8",
+      "status": "OK"
+    },
+    "gpu_vram": {
+      "detected": "2 × 24 GB TITAN RTX (NVLink)",
+      "minimum_for_inference": "~8 GB (4-bit quantized Qwen3-8B)",
+      "minimum_for_training": "~24 GB (QLoRA on second GPU)",
+      "recommended": "Dual 24 GB with NVLink (as configured)",
+      "status": "OK"
+    },
+    "disk_space": {
+      "qwen3_bf16_model": "~16 GB",
+      "qwen3_nf4_inference": "~5 GB",
+      "bge_m3_embedding": "~2.2 GB",
+      "daily_lora_adapters": "~150 MB per day",
+      "chroma_db_episodic": "grows with usage",
+      "total_recommended_free": ">=60 GB"
+    },
+    "ram": {
+      "minimum_gb": 32,
+      "recommended_gb": 64,
+      "notes": "ChromaDB + model loading peaks can require 32-48 GB RAM"
+    }
+  },
+
+  "install_sequence": {
+    "description": "Recommended installation order to avoid dependency conflicts",
+    "steps": [
+      {
+        "step": 1,
+        "action": "Create dedicated Python 3.11 conda environment",
+        "command": "conda create -n daedalus-env python=3.11 -y && conda activate daedalus-env"
+      },
+      {
+        "step": 2,
+        "action": "Install PyTorch with CUDA 12.8 support",
+        "command": "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128",
+        "notes": "Match the CUDA version already on your system (cu128)"
+      },
+      {
+        "step": 3,
+        "action": "Install Unsloth (CUDA-specific build)",
+        "command": "pip install unsloth",
+        "notes": "May require extra args for your specific CUDA version — check https://github.com/unslothai/unsloth"
+      },
+      {
+        "step": 4,
+        "action": "Install remaining Python packages via pyproject.toml",
+        "command": "pip install -e . && pip install bitsandbytes peft trl chromadb hdbscan anthropic FlagEmbedding"
+      },
+      {
+        "step": 5,
+        "action": "Set up API keys",
+        "command": "python scripts/setup_env.py",
+        "notes": "Interactive wizard. DEEPSEEK_API_KEY already present in ~/.apikey/daedalus.json. Add ANTHROPIC_API_KEY."
+      },
+      {
+        "step": 6,
+        "action": "Log in to Hugging Face Hub",
+        "command": "huggingface-cli login",
+        "notes": "Required to download Qwen3-14B from HuggingFace Hub"
+      },
+      {
+        "step": 7,
+        "action": "Download Qwen3-8B base model",
+        "command": "huggingface-cli download Qwen/Qwen3-8B --local-dir ./models/lineage/base_v000.bf16",
+        "notes": "~16 GB download. Open-weight, no access gate required."
+      },
+      {
+        "step": 8,
+        "action": "BGE-M3 embedding model (auto-downloaded)",
+        "command": "python3 -c \"from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3'); print('BGE-M3 ready.')\"",
+        "notes": "~2.2 GB. Will be cached in ~/.cache/huggingface/"
+      },
+      {
+        "step": 9,
+        "action": "Run seeding phase",
+        "command": "python scripts/seed.py",
+        "notes": "Carves the wood: fine-tunes Qwen3-8B on DAEDALUS seed pairs. ~30-60 min on dual Titan RTX."
+      },
+      {
+        "step": 10,
+        "action": "First morning awakening",
+        "command": "python scripts/start_day.py --interactive"
+      }
+    ]
+  }
+}

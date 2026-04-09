@@ -1,0 +1,54 @@
+# DAEDALUS v0.5 — Soul Bridge Configuration
+# The bridge to deeper reasoning. Multi-provider with fallback.
+# DeepSeek R1 is primary during initial/calibration phase.
+
+soul_bridge:
+  fallback_order: ["deepseek", "claude", "grok", "local"]
+
+  providers:
+    deepseek:
+      enabled: true
+      daytime_model: "deepseek-chat"
+      nightly_model: "deepseek-reasoner"
+      api_key_env: "DEEPSEEK_API_KEY"
+      base_url: "https://api.deepseek.com"
+      timeout_seconds: 180           # DeepSeek R1 can be slower (reasoning chains)
+      max_retries: 2
+
+    claude:
+      enabled: false                 # enable when transitioning to Claude for nightly
+      daytime_model: "claude-sonnet-4-20250514"
+      nightly_model: "claude-opus-4-20250514"
+      api_key_env: "ANTHROPIC_API_KEY"
+      timeout_seconds: 120
+      max_retries: 2
+
+    grok:
+      enabled: false                 # enable when API access confirmed
+      model: "grok-3"
+      api_key_env: "XAI_API_KEY"
+      base_url: "https://api.x.ai/v1"
+      timeout_seconds: 120
+      max_retries: 2
+
+    local:
+      enabled: false                 # enabled after day-30 distillation
+      model_path: "./models/judge_distilled/"
+      min_agreement_for_activation: 0.85
+
+  continuity:
+    threshold: 0.70                  # below this → conservative identity update
+    recent_window: 3                 # compare against last N reflections
+    reprocess_queue: true            # re-consolidate shallow entries when API returns
+    embedding_weight: 0.6            # weight for embedding coherence in continuity score
+    structural_weight: 0.4           # weight for JSON structural similarity
+
+  shallow_mode:
+    tag: "unconsolidated-deep"
+    auto_reprocess: true             # reprocess queued episodes next available night
+    max_queue_days: 7                # alert if queue exceeds this
+
+  circuit_breaker:
+    consecutive_failures: 3          # failures before opening circuit
+    backoff_minutes: [5, 30, 120, 240]  # escalating backoff
+    reset_after_hours: 6             # close circuit after this cooldown
