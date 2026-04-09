@@ -163,7 +163,7 @@ class ConversationEngine:
 
         logger.info(
             f"Turn {self._turn_count}: salience={episode.salience:.3f}, "
-            f"L_local={episode.lagrangian_local:.3f if episode.lagrangian_local else 'N/A'}"
+            f"L_local={episode.lagrangian_local:.3f}" if episode.lagrangian_local is not None else "L_local=N/A"
         )
 
         return final_response

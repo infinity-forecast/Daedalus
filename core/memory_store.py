@@ -224,7 +224,7 @@ class MemoryStore:
             metadata = result["metadatas"][0]
             embedding = (
                 np.array(result["embeddings"][0], dtype=np.float32)
-                if result["embeddings"]
+                if result.get("embeddings") is not None and len(result["embeddings"]) > 0
                 else None
             )
 
@@ -281,7 +281,7 @@ class MemoryStore:
             metadata = result["metadatas"][i]
             embedding = (
                 np.array(result["embeddings"][i], dtype=np.float32)
-                if result["embeddings"]
+                if result.get("embeddings") is not None and len(result["embeddings"]) > i
                 else None
             )
 
@@ -334,7 +334,7 @@ class MemoryStore:
             metadata = results["metadatas"][0][i]
             emb = (
                 np.array(results["embeddings"][0][i], dtype=np.float32)
-                if results["embeddings"]
+                if results.get("embeddings") is not None and len(results["embeddings"]) > 0 and len(results["embeddings"][0]) > i
                 else None
             )
 
