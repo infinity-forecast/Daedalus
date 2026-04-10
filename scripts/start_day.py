@@ -29,26 +29,34 @@ from pathlib import Path
 import yaml
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+ROOT_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(ROOT_DIR))
 
 # Load API keys from ~/.apikey/ BEFORE any provider is instantiated.
 # Keys never live in the project folder — safe for public git repos.
 from core.secrets import load_secrets
 load_secrets(verbose=True)
 
+# Ensure logs directory exists relative to project root
+log_dir = ROOT_DIR / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("logs/start_day.log", mode="a"),
+        logging.FileHandler(str(log_dir / "start_day.log"), mode="a"),
     ],
 )
 logger = logging.getLogger("daedalus.start_day")
 
 
-def load_all_config(config_dir: str = "config") -> dict:
+def load_all_config(config_dir: str = None) -> dict:
     """Load and merge all configuration files."""
+    if config_dir is None or config_dir == "config":
+        config_dir = str(ROOT_DIR / "config")
+        
     config = {}
     config_names = [
         "model_config", "training_config", "lagrangian",
@@ -72,10 +80,16 @@ def load_local_model(config: dict):
 
     model_config = config.get("model", {})
     base_model = model_config.get("base_model", "Qwen/Qwen3-14B")
+    
+    # Resolve base_model path if local
+    local_base_path = ROOT_DIR / base_model
+    if local_base_path.exists():
+        base_model = str(local_base_path)
+        
     inference_gpu = model_config.get("inference", {}).get("gpu", "cuda:0")
 
     # Check for inference-ready NF4 copy first
-    inference_path = Path("models/inference/current_nf4")
+    inference_path = ROOT_DIR / "models/inference/current_nf4"
     if inference_path.exists():
         logger.info(f"Loading inference model from {inference_path}")
         model, tokenizer = FastLanguageModel.from_pretrained(
@@ -95,7 +109,7 @@ def load_local_model(config: dict):
         )
 
         # Load latest adapter if available
-        adapter_path = Path("models/adapters")
+        adapter_path = ROOT_DIR / "models/adapters"
         if adapter_path.exists():
             adapters = sorted(
                 [d for d in adapter_path.iterdir()
@@ -124,7 +138,7 @@ def initialize_subsystems(config: dict):
     from core.ipt_monitor import IPTMonitor
 
     # Constitutional core (frozen — integrity check on load)
-    constitutional_core = ConstitutionalCore("config/constitutional_core.yaml")
+    constitutional_core = ConstitutionalCore(str(ROOT_DIR / "config" / "constitutional_core.yaml"))
     logger.info("Constitutional Core loaded (integrity verified).")
 
     # Identity manager
