@@ -401,9 +401,15 @@ Output the full JSON judgment structure as specified."""
 
     def _extract_json(self, text: str) -> Optional[dict]:
         """Extract JSON from text, handling various formats."""
+        import re as _re
+
+        # Strip <think>...</think> blocks (DeepSeek R1 reasoning traces)
+        text = _re.sub(r'<think>.*?</think>\s*', '', text, flags=_re.DOTALL)
+        text = _re.sub(r'<think>.*$', '', text, flags=_re.DOTALL)
+
         # Direct parse
         try:
-            return json.loads(text)
+            return json.loads(text.strip())
         except (json.JSONDecodeError, ValueError):
             pass
 

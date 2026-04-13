@@ -109,6 +109,38 @@ class TrainingPairGenerator:
             f"{sum(1 for p in pairs if p.type == 'anchor')} anchors"
         )
 
+        # v0.6: Filter training pairs by grounding score
+        try:
+            from core.training_pair_filter import filter_training_batch
+            from core.memory_store import _get_embedding_model
+            embedder = _get_embedding_model()
+            core_embedding = self.core._get_core_embedding()
+            accepted, rejected = filter_training_batch(
+                pairs, embedder, core_embedding
+            )
+            logger.info(
+                f"Grounding filter: {len(accepted)} accepted, "
+                f"{len(rejected)} rejected"
+            )
+            # Rebuild as TrainingPair objects from accepted dicts
+            filtered_pairs = []
+            for p in pairs:
+                p_dict = p.to_dict()
+                # Check if this pair was accepted
+                is_rejected = False
+                for r in rejected:
+                    if (
+                        r.get("instruction") == p_dict.get("instruction")
+                        and r.get("response") == p_dict.get("response")
+                    ):
+                        is_rejected = True
+                        break
+                if not is_rejected:
+                    filtered_pairs.append(p)
+            pairs = filtered_pairs
+        except Exception as e:
+            logger.warning(f"Training pair filter failed, using all pairs: {e}")
+
         return pairs
 
     def _generate_type_a(

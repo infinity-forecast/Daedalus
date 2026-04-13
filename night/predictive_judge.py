@@ -177,8 +177,14 @@ Output a single JSON object:
 
     def _parse_response(self, text: str) -> dict:
         """Extract JSON from the predictive judge response."""
+        import re
+
+        # Strip <think>...</think> blocks (DeepSeek R1 reasoning traces)
+        text = re.sub(r'<think>.*?</think>\s*', '', text, flags=re.DOTALL)
+        text = re.sub(r'<think>.*$', '', text, flags=re.DOTALL)
+
         try:
-            return json.loads(text)
+            return json.loads(text.strip())
         except (json.JSONDecodeError, ValueError):
             pass
 

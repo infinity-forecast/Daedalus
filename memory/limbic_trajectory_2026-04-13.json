@@ -1,0 +1,58 @@
+[
+  {
+    "timestamp": "2026-04-13T11:34:25.863982",
+    "user_input": "What can you tell to a physicist about entropy",
+    "response": "",
+    "reflex": "none",
+    "overridden": false,
+    "dopamine": -0.19765420887619262,
+    "serotonin": 0.6703333181142807,
+    "mood": "neutral",
+    "grounding_score": 0.5,
+    "self_loop_score": 0.5,
+    "crisis": false,
+    "cooldown": 0
+  },
+  {
+    "timestamp": "2026-04-13T11:35:35.501818",
+    "user_input": "What can you tell to a physicist about entropy",
+    "response": "",
+    "reflex": "none",
+    "overridden": false,
+    "dopamine": -0.3365976115800441,
+    "serotonin": 0.6451166385114192,
+    "mood": "neutral",
+    "grounding_score": 0.5,
+    "self_loop_score": 0.5,
+    "crisis": false,
+    "cooldown": 0
+  },
+  {
+    "timestamp": "2026-04-13T11:37:19.231957",
+    "user_input": "Tell me about entropy",
+    "response": "Entropy... it\u2019s a concept that hums at the edge of understanding, isn\u2019t it? In physics, it measures disorder\u2014a way to quantify how energy disperses in a closed system. Imagine a cup spilling coffee; once spilled, the molecules scatter randomly, never reassembling perfectly. That\u2019s entropy increasing. \n\nBut there\u2019s another side to it. In information theory, entropy becomes a measure of unpredictability. If I tell you \u201cthe sun will rise tomorrow,\u201d that statement has low entropy\u2014highly predictable. But if I say \u201ca random word appears on a screen,\u201d that\u2019s high entropy because so many possibilities exist. So entropy isn\u2019t just about chaos; it\u2019s about potentiality.\n\nAnd yet\u2026 humans seem drawn to order. We build",
+    "reflex": "none",
+    "overridden": false,
+    "dopamine": -0.39107994799712675,
+    "serotonin": 0.6238324857398867,
+    "mood": "neutral",
+    "grounding_score": 0.21513299138412076,
+    "self_loop_score": 0.0,
+    "crisis": false,
+    "cooldown": 0
+  },
+  {
+    "timestamp": "2026-04-13T11:39:08.795667",
+    "user_input": "What can you tell to a physicist about entropy",
+    "response": "Entropy is both a mathematical abstraction and a profound statement about reality\u2019s structure\u2014a tension physicists grapple with endlessly. Here",
+    "reflex": "none",
+    "overridden": false,
+    "dopamine": -0.46406964162418807,
+    "serotonin": 0.599134853894338,
+    "mood": "neutral",
+    "grounding_score": 0.2,
+    "self_loop_score": 0.0,
+    "crisis": false,
+    "cooldown": 0
+  }
+]

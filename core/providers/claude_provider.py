@@ -41,8 +41,8 @@ Output format requirements for DAEDALUS integration:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        daytime_model: str = "claude-sonnet-4-20250514",
-        nightly_model: str = "claude-opus-4-20250514",
+        daytime_model: str = "claude-sonnet-4-6",
+        nightly_model: str = "claude-opus-4-6",
         timeout: int = 120,
         max_retries: int = 2,
     ):

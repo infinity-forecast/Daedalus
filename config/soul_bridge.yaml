@@ -16,9 +16,9 @@ soul_bridge:
       max_retries: 2
 
     claude:
-      enabled: false                 # enable when transitioning to Claude for nightly
-      daytime_model: "claude-sonnet-4-20250514"
-      nightly_model: "claude-opus-4-20250514"
+      enabled: true                  # enabled as fallback — DeepSeek remains primary
+      daytime_model: "claude-sonnet-4-6"
+      nightly_model: "claude-opus-4-6"
       api_key_env: "ANTHROPIC_API_KEY"
       timeout_seconds: 120
       max_retries: 2

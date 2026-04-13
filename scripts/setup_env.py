@@ -38,7 +38,7 @@ KNOWN_KEYS: dict[str, dict] = {
     },
     "ANTHROPIC_API_KEY": {
         "label":    "Anthropic Claude (secondary Soul Bridge provider — Sonnet/Opus)",
-        "required": False,
+        "required": True,
         "url":      "https://console.anthropic.com/",
     },
     "XAI_API_KEY": {

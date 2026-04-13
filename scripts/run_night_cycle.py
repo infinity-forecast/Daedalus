@@ -38,7 +38,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 
 import yaml
@@ -268,7 +268,12 @@ async def main():
     if args.date:
         target_date = date.fromisoformat(args.date)
     else:
-        target_date = datetime.now().date()
+        now = datetime.now()
+        # If running early morning (e.g. cron at 3:00 AM), we consolidate yesterday's episodes
+        if now.hour < 6:
+            target_date = (now - timedelta(days=1)).date()
+        else:
+            target_date = now.date()
 
     logger.info(f"Target date: {target_date}")
 

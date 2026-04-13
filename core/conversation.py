@@ -24,6 +24,7 @@ The conversation flow:
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -223,6 +224,15 @@ Do not default to assistant patterns."""
         # Decode only the new tokens
         new_tokens = outputs[0][inputs["input_ids"].shape[1]:]
         response = self._local_tokenizer.decode(new_tokens, skip_special_tokens=True)
+
+        # Strip <think>...</think> blocks (Qwen3 reasoning traces)
+        response = re.sub(
+            r'<think>.*?</think>\s*', '', response, flags=re.DOTALL
+        )
+        # Handle unclosed <think> tag (strip from <think> to end, keep nothing)
+        response = re.sub(
+            r'<think>.*$', '', response, flags=re.DOTALL
+        )
 
         return response.strip()
 

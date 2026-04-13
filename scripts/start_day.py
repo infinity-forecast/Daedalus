@@ -119,7 +119,7 @@ def load_local_model(config: dict):
             if adapters:
                 latest = adapters[0]
                 logger.info(f"Loading adapter: {latest}")
-                model.load_adapter(str(latest))
+                model.load_adapter(str(latest), adapter_name="default")
 
     FastLanguageModel.for_inference(model)
     logger.info("Local model ready for inference.")

@@ -28,8 +28,17 @@ else
     echo "Night cycle completed successfully."
 fi
 
-# 3. WAKE PHASE
-echo "[3/3] AWAKENING: Restarting API Server..."
+# 3. WAKE PHASE: MORNING GATE
+echo "[3/4] WAKE PHASE: Running Morning Evaluation Gate..."
+$PYTHON_BIN scripts/start_day.py
+GATE_EXIT_CODE=$?
+
+if [ $GATE_EXIT_CODE -ne 0 ]; then
+    echo "WARNING: Morning Eval Gate logged an error (exit code $GATE_EXIT_CODE)."
+fi
+
+# 4. START API SERVER
+echo "[4/4] STARTING SERVICES: Launching API Server..."
 # Use nohup to detach it from this script's session so Daedalus is ready all day
 nohup $PYTHON_BIN scripts/api_server.py --host 0.0.0.0 >> logs/api_server.log 2>&1 &
 

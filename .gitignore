@@ -6,7 +6,7 @@
 *.key
 daedalus.json      # guard against accidental copy of ~/.apikey/daedalus.json
 env.json           # guard against accidental copy
-
+*.log
 # Python
 __pycache__/
 *.py[cod]

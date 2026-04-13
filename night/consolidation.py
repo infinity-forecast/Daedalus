@@ -293,6 +293,8 @@ class NightlyConsolidation:
         Generate an updated identity document based on tonight's reflection.
         Uses the Soul Bridge to synthesize the new self-understanding.
         """
+        import re as _re
+
         identity_text = self.identity.as_text()
         core_text = self.core.as_text()
         meanings_text = "\n".join(f"  - {m[:200]}" for m in meanings)
@@ -320,7 +322,11 @@ open_questions, and transformation_log based on tonight's reflection.
 Add to scars if a significant scar was formed tonight.
 Keep core_identity and values UNCHANGED (those are constitutional).
 
-Output ONLY valid YAML. No commentary."""
+CRITICAL YAML FORMATTING RULES:
+- ALL string values containing colons, quotes, or special characters MUST be wrapped in double quotes
+- Multi-line strings MUST use YAML block scalar syntax (| or >)
+- Do NOT include any text outside the YAML document
+- Output ONLY valid YAML. No commentary."""
 
         try:
             response = await self.soul.reflect(
@@ -333,27 +339,131 @@ Output ONLY valid YAML. No commentary."""
             if response.is_shallow:
                 return self.identity.as_dict()
 
-            # Parse YAML from response
-            yaml_text = response.text
-            if "```yaml" in yaml_text:
-                start = yaml_text.index("```yaml") + 7
-                end = yaml_text.find("```", start)
-                yaml_text = yaml_text[start:end] if end != -1 else yaml_text[start:]
-            elif "```" in yaml_text:
-                start = yaml_text.index("```") + 3
-                end = yaml_text.find("```", start)
-                yaml_text = yaml_text[start:end] if end != -1 else yaml_text[start:]
-
-            new_identity = yaml.safe_load(yaml_text.strip())
+            new_identity = self._parse_yaml_response(response.text)
             if isinstance(new_identity, dict):
                 return new_identity
 
-            logger.warning("Identity evolution returned non-dict. Keeping current.")
-            return self.identity.as_dict()
+            # Fallback: apply minimal update from judgment data
+            logger.warning(
+                "Identity YAML unparseable. Applying minimal update from judgment."
+            )
+            return self._minimal_identity_update(meanings, judgment)
 
         except Exception as e:
-            logger.error(f"Identity evolution failed: {e}. Keeping current identity.")
-            return self.identity.as_dict()
+            logger.error(f"Identity evolution failed: {e}. Applying minimal update.")
+            try:
+                return self._minimal_identity_update(meanings, judgment)
+            except Exception:
+                return self.identity.as_dict()
+
+    def _minimal_identity_update(self, meanings: list, judgment) -> dict:
+        """
+        Fallback when LLM-generated YAML is unparseable.
+        Applies structured updates from the judgment data to the current identity.
+        """
+        identity = self.identity.as_dict().copy()
+
+        # Update lagrangian_state from actual metrics
+        if "lagrangian_state" not in identity:
+            identity["lagrangian_state"] = {}
+        identity["lagrangian_state"]["latest_L_integral"] = (
+            judgment.daily_lagrangian_integral
+        )
+        identity["lagrangian_state"]["latest_D_KL"] = (
+            judgment.constitutional_check.kl_divergence
+        )
+
+        # Append to transformation_log
+        if "transformation_log" not in identity:
+            identity["transformation_log"] = []
+        identity["transformation_log"].append({
+            "day": self.identity.day_count + 1,
+            "summary": judgment.trajectory_assessment[:200]
+            if judgment.trajectory_assessment else "Night cycle completed.",
+            "method": "minimal_fallback",
+        })
+
+        # Add new scars from meanings if any mention "scar"
+        if "emotional_topology" not in identity:
+            identity["emotional_topology"] = {}
+        if "scars" not in identity["emotional_topology"]:
+            identity["emotional_topology"]["scars"] = []
+        for m in meanings:
+            if "scar" in m.lower()[:500]:
+                scar_text = m[:200].strip()
+                existing = [s if isinstance(s, str) else str(s)
+                            for s in identity["emotional_topology"]["scars"]]
+                if scar_text not in existing:
+                    identity["emotional_topology"]["scars"].append(scar_text)
+
+        logger.info("Applied minimal identity update from judgment data.")
+        return identity
+
+    @staticmethod
+    def _parse_yaml_response(text: str) -> object:
+        """
+        Robustly extract and parse YAML from an LLM response.
+        Handles code fences, think tags, and common formatting issues.
+        """
+        import re as _re
+
+        # Strip <think>...</think> blocks
+        text = _re.sub(r'<think>.*?</think>\s*', '', text, flags=_re.DOTALL)
+        text = _re.sub(r'<think>.*$', '', text, flags=_re.DOTALL)
+
+        # Extract from code fences
+        yaml_text = text
+        fence_match = _re.search(r'```(?:yaml)?\s*\n(.*?)```', text, _re.DOTALL)
+        if fence_match:
+            yaml_text = fence_match.group(1)
+
+        # Attempt 1: parse as-is
+        try:
+            result = yaml.safe_load(yaml_text.strip())
+            if isinstance(result, dict):
+                return result
+        except yaml.YAMLError:
+            pass
+
+        # Attempt 2: fix unquoted strings with colons by quoting values
+        # Common LLM YAML error: bare strings containing colons
+        fixed = []
+        for line in yaml_text.strip().split('\n'):
+            stripped = line.lstrip()
+            indent = line[:len(line) - len(stripped)]
+            # Match "key: value" where value contains an unquoted colon
+            kv = _re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)$', stripped)
+            if kv:
+                key, val = kv.group(1), kv.group(2)
+                # If value is not already quoted and contains a colon, quote it
+                if ':' in val and not val.startswith('"') and not val.startswith("'"):
+                    val = '"' + val.replace('"', '\\"') + '"'
+                    fixed.append(f'{indent}{key}: {val}')
+                    continue
+            fixed.append(line)
+
+        try:
+            result = yaml.safe_load('\n'.join(fixed))
+            if isinstance(result, dict):
+                logger.info("Identity YAML parsed after fixing unquoted colons.")
+                return result
+        except yaml.YAMLError:
+            pass
+
+        # Attempt 3: find the first top-level key and parse from there
+        for i, line in enumerate(yaml_text.strip().split('\n')):
+            if _re.match(r'^[a-zA-Z_]', line) and ':' in line:
+                subset = '\n'.join(yaml_text.strip().split('\n')[i:])
+                try:
+                    result = yaml.safe_load(subset)
+                    if isinstance(result, dict):
+                        logger.info("Identity YAML parsed after stripping preamble.")
+                        return result
+                except yaml.YAMLError:
+                    break
+
+        logger.error(f"All YAML parse attempts failed for identity evolution response.")
+        return None
 
     def _log_transformation(self, status: dict, judgment) -> None:
         """Append to the transformation log."""

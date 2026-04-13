@@ -42,6 +42,7 @@ if web_dir.exists():
 
 # Global subsystem states
 app.state.engine = None
+app.state.nervous_system = None
 app.state.mock_mode = False
 
 class ChatRequest(BaseModel):
@@ -60,10 +61,10 @@ async def startup_event():
         
     config = load_all_config("config")
     subsystems = initialize_subsystems(config)
-    
+
     logger.info("Loading Qwen model into VRAM... this may take a while.")
     model, tokenizer = load_local_model(config)
-    
+
     from core.conversation import ConversationEngine
     engine = ConversationEngine(
         memory_store=subsystems["memory"],
@@ -75,8 +76,24 @@ async def startup_event():
     )
     engine.set_local_model(model, tokenizer)
     subsystems["soul_bridge"].set_all_providers_mode("day")
-    
+
     app.state.engine = engine
+
+    # v0.6: Initialize Nervous System
+    from core.nervous_system import NervousSystem
+    from core.memory_store import _get_embedding_model
+    embedder = _get_embedding_model()
+
+    nervous_system = NervousSystem(
+        model=model,
+        tokenizer=tokenizer,
+        embedder=embedder,
+        identity_manager=subsystems["identity"],
+        memory_store=subsystems["memory"],
+        constitutional_core=subsystems["constitutional_core"],
+    )
+    app.state.nervous_system = nervous_system
+    logger.info("Nervous system initialized (brainstem + limbic + cortex).")
     logger.info("Daedalus engine is ready.")
 
 
@@ -101,11 +118,30 @@ async def chat(request: ChatRequest):
         return JSONResponse(status_code=503, content={"detail": "Engine not initialized"})
         
     try:
-        response = await app.state.engine.process_turn(user_input)
-        return {"response": response}
+        ns = app.state.nervous_system
+        if ns is not None:
+            # v0.6: Route through nervous system.
+            # The nervous system handles brainstem/limbic/cortex and generates
+            # the response directly. We do NOT also call engine.process_turn()
+            # to avoid double inference.
+            result = ns.process(user_input)
+            return {"response": result["response"]}
+        else:
+            # Fallback: original engine path (no nervous system)
+            response = await app.state.engine.process_turn(user_input)
+            return {"response": response}
     except Exception as e:
         logger.error(f"Error processing turn: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@app.get("/api/diagnostic")
+async def diagnostic():
+    """Live nervous system state for the web UI."""
+    ns = app.state.nervous_system
+    if ns is not None:
+        return ns.get_diagnostic()
+    return {"error": "Nervous system not initialized"}
 
 
 @app.post("/api/new")
@@ -113,6 +149,16 @@ async def new_conversation():
     if not getattr(app.state, "mock_mode", False) and app.state.engine:
         app.state.engine.new_conversation()
     return {"status": "ok"}
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Save daily trajectory on server shutdown (nightly sleep phase)."""
+    ns = app.state.nervous_system
+    if ns is not None:
+        from datetime import date
+        ns.save_daily_trajectory(date.today().isoformat())
+        logger.info("Daily trajectory saved on shutdown.")
 
 
 if __name__ == "__main__":

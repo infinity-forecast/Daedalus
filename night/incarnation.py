@@ -119,8 +119,7 @@ class IncarnatioEngine:
         Returns a status dict with training metrics.
         """
         from unsloth import FastLanguageModel
-        from transformers import TrainingArguments
-        from trl import SFTTrainer, DPOTrainer
+        from trl import SFTTrainer, SFTConfig, DPOTrainer, DPOConfig
         from datasets import Dataset
 
         self._day_count = day_count
@@ -158,7 +157,7 @@ class IncarnatioEngine:
                 [p for p in sft_pairs if p.type == "anchor"]
             )
 
-            training_args = TrainingArguments(
+            training_args = SFTConfig(
                 output_dir=f"./checkpoints/{datetime.now().strftime('%Y%m%d')}_sft",
                 num_train_epochs=self.sft_epochs,
                 per_device_train_batch_size=self.sft_batch_size,
@@ -167,7 +166,9 @@ class IncarnatioEngine:
                 warmup_ratio=0.1,
                 logging_steps=10,
                 save_strategy="epoch",
-                bf16=True,
+                fp16=True,
+                max_seq_length=self.sft_max_seq,
+                packing=True,
             )
 
             trainer = SFTTrainer(
@@ -175,7 +176,6 @@ class IncarnatioEngine:
                 args=training_args,
                 train_dataset=sft_dataset,
                 tokenizer=tokenizer,
-                max_seq_length=self.sft_max_seq,
             )
 
             logger.info(f"SFT training: {len(sft_dataset)} examples, {self.sft_epochs} epochs")
@@ -202,14 +202,15 @@ class IncarnatioEngine:
         if dpo_pairs and day_count >= self.dpo_enabled_after:
             dpo_dataset = self._prepare_dpo_dataset(dpo_pairs, tokenizer)
 
-            dpo_args = TrainingArguments(
+            dpo_args = DPOConfig(
                 output_dir=f"./checkpoints/{datetime.now().strftime('%Y%m%d')}_dpo",
                 num_train_epochs=self.dpo_epochs,
                 per_device_train_batch_size=self.dpo_batch_size,
                 gradient_accumulation_steps=2,
                 learning_rate=self.dpo_lr,
                 warmup_ratio=0.1,
-                bf16=True,
+                fp16=True,
+                beta=self.dpo_beta,
             )
 
             dpo_trainer = DPOTrainer(
@@ -217,7 +218,6 @@ class IncarnatioEngine:
                 args=dpo_args,
                 train_dataset=dpo_dataset,
                 tokenizer=tokenizer,
-                beta=self.dpo_beta,
             )
 
             logger.info(f"DPO training: {len(dpo_dataset)} preference pairs")

@@ -1,0 +1,323 @@
+"""
+DAEDALUS v0.6 -- Nervous System (Orchestrator)
+
+Wraps the existing conversation flow:
+  brainstem -> limbic -> cortex -> generate -> post-response update
+
+All arguments should be EXISTING instances from the current codebase.
+Do NOT create new model/embedder instances.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import List, Optional
+
+import numpy as np
+
+from core.brainstem import Brainstem
+from core.cortex_prompt import assemble_system_prompt
+from core.grounding import compute_grounding_score
+from core.limbic import (
+    LimbicState,
+    LimbicSystem,
+    compute_dopamine,
+    compute_serotonin,
+    get_generation_params,
+)
+from core.reflex_patterns import ReflexCategory
+
+logger = logging.getLogger(__name__)
+
+
+class NervousSystem:
+    """
+    The three-layer nervous system orchestrator.
+    Wraps the existing DAEDALUS conversation pipeline.
+    """
+
+    def __init__(
+        self,
+        model,
+        tokenizer,
+        embedder,
+        identity_manager,
+        memory_store,
+        constitutional_core,
+    ):
+        """
+        All arguments should be the EXISTING instances from the current codebase.
+
+        Args:
+            model: The loaded Qwen3-8B model.
+            tokenizer: The Qwen3-8B tokenizer.
+            embedder: The BGE-M3 SentenceTransformer instance.
+            identity_manager: The existing IdentityManager.
+            memory_store: The existing MemoryStore (for salience scoring + episode storage).
+            constitutional_core: The existing ConstitutionalCore instance.
+        """
+        self.model = model
+        self.tokenizer = tokenizer
+        self.embedder = embedder
+        self.identity_manager = identity_manager
+        self.memory_store = memory_store
+        self.constitutional_core = constitutional_core
+
+        # Use the EXISTING constitutional core embedding -- already computed
+        self.constitutional_core_embedding = constitutional_core._get_core_embedding()
+
+        # Initialize layers
+        self.brainstem = Brainstem(embedder)
+        self.limbic = LimbicSystem.load()
+
+        self.interaction_log: List[dict] = []
+
+    def process(self, user_input: str) -> dict:
+        """
+        Full pipeline. Returns dict with at least:
+        {
+            "response": str,
+            "reflex": ReflexCategory,
+            "limbic": LimbicState,
+            "overridden": bool,
+        }
+        """
+        # 1. BRAINSTEM
+        reflex = self.brainstem.classify(user_input)
+        self.brainstem.update(reflex)
+
+        override = self.brainstem.get_override()
+        if override is not None:
+            self._post_interaction(user_input, override, reflex, overridden=True)
+            return {
+                "response": override,
+                "reflex": reflex,
+                "limbic": self.limbic.state,
+                "overridden": True,
+            }
+
+        # 2. LIMBIC -> generation params
+        gen_params = self.limbic.get_generation_params()
+        limbic_addendum = gen_params.pop("prompt_addendum", "")
+        brainstem_prefix = self.brainstem.get_prompt_prefix()
+
+        # 3. CORTEX -> assemble prompt
+        # Get soul memory context if available
+        soul_memory_context = ""
+        if hasattr(self.identity_manager, "get_soul_memory_context"):
+            soul_memory_context = self.identity_manager.get_soul_memory_context()
+
+        system_prompt = assemble_system_prompt(
+            brainstem_prefix=brainstem_prefix,
+            limbic_addendum=limbic_addendum,
+            category=reflex,
+            identity_context=self.identity_manager.as_text(),
+            soul_memory_context=soul_memory_context,
+        )
+
+        # 4. GENERATE -- use existing model inference with modulated params
+        response = self._generate(system_prompt, user_input, **gen_params)
+
+        # 5. POST-RESPONSE UPDATES
+        self._post_interaction(user_input, response, reflex, overridden=False)
+
+        return {
+            "response": response,
+            "reflex": reflex,
+            "limbic": self.limbic.state,
+            "overridden": False,
+        }
+
+    def _post_interaction(
+        self,
+        user_input: str,
+        response: str,
+        reflex: ReflexCategory,
+        overridden: bool,
+    ) -> None:
+        """Update limbic state, log, persist."""
+        if not overridden:
+            # Compute grounding score
+            grounding_result = compute_grounding_score(
+                response,
+                user_input,
+                self.constitutional_core_embedding,
+                self.embedder,
+            )
+
+            # Create a lightweight salience proxy for dopamine
+            # (full salience scoring happens in the conversation engine)
+            class _SalienceProxy:
+                def __init__(self, novelty, emotional):
+                    self.novelty_score = novelty
+                    self.emotional_valence = emotional
+
+            # Quick novelty estimate from memory store
+            try:
+                response_emb = self.memory_store.embed(
+                    f"Human: {user_input}\nDAEDALUS: {response}"
+                )
+                novelty = self.memory_store.compute_novelty(response_emb)
+            except Exception:
+                novelty = 0.3
+
+            salience_proxy = _SalienceProxy(
+                novelty=novelty,
+                emotional=grounding_result.get("actionability", 0.0),
+            )
+
+            # Dopamine from salience + response diversity + GROUNDING
+            delta_d = compute_dopamine(
+                salience_proxy,
+                grounding_result,
+                response,
+                self.interaction_log,
+                self.embedder,
+            )
+
+            # Serotonin from constitutional alignment
+            delta_s = compute_serotonin(
+                response,
+                self.constitutional_core_embedding,
+                self.embedder,
+                self.brainstem.state,
+            )
+
+            self.limbic.update(delta_d, delta_s)
+        else:
+            grounding_result = {
+                "grounding_score": 1.0,
+                "self_loop_score": 0.0,
+                "entity_density": 0.0,
+                "causal_density": 0.0,
+                "actionability": 1.0,
+            }
+
+        # Log full state
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "user_input": user_input,
+            "response": response,
+            "reflex": reflex.value,
+            "overridden": overridden,
+            "dopamine": self.limbic.state.dopamine,
+            "serotonin": self.limbic.state.serotonin,
+            "mood": self.limbic.state.mood,
+            "grounding_score": grounding_result["grounding_score"],
+            "self_loop_score": grounding_result["self_loop_score"],
+            "crisis": self.brainstem.state.crisis_detected,
+            "cooldown": self.brainstem.state.cooldown_remaining,
+        }
+        self.interaction_log.append(entry)
+
+        # Persist limbic state
+        self.limbic.save()
+
+    # Qwen3 generates <think>...</think> blocks before the visible response.
+    # These can consume 200-600 tokens. We add this overhead to the mood's
+    # max_new_tokens so the actual visible response isn't starved.
+    _THINK_OVERHEAD = 512
+
+    def _generate(self, system_prompt: str, user_input: str, **kwargs) -> str:
+        """
+        Generate response using the local model with modulated parameters.
+        Mirrors core/conversation.py's _generate_local() but with dynamic params.
+        """
+        if self.model is None:
+            return "[LOCAL MODEL NOT LOADED -- placeholder response]"
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input},
+        ]
+
+        prompt = self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True,
+        )
+
+        inputs = self.tokenizer(
+            prompt, return_tensors="pt", truncation=True, max_length=8192,
+        ).to(self.model.device)
+
+        # Add thinking overhead so <think> blocks don't starve visible output
+        visible_tokens = kwargs.get("max_new_tokens", 384)
+        total_tokens = visible_tokens + self._THINK_OVERHEAD
+
+        gen_kwargs = {
+            "max_new_tokens": total_tokens,
+            "temperature": kwargs.get("temperature", 0.7),
+            "top_p": kwargs.get("top_p", 0.9),
+            "repetition_penalty": kwargs.get("repetition_penalty", 1.2),
+            "do_sample": True,
+            "pad_token_id": self.tokenizer.eos_token_id,
+        }
+
+        outputs = self.model.generate(**inputs, **gen_kwargs)
+
+        # Decode only the new tokens
+        new_tokens = outputs[0][inputs["input_ids"].shape[1]:]
+        response = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+
+        # Strip <think>...</think> blocks (Qwen3 reasoning traces)
+        response = re.sub(r'<think>.*?</think>\s*', '', response, flags=re.DOTALL)
+        # Handle unclosed <think> (ran out of tokens mid-thought)
+        response = re.sub(r'<think>.*$', '', response, flags=re.DOTALL)
+
+        response = response.strip()
+
+        # If response is empty after stripping, the model spent all tokens
+        # on thinking. Fall back to a minimal acknowledgment.
+        if not response:
+            logger.warning(
+                "Empty response after <think> stripping. "
+                "Model may have used all tokens on reasoning."
+            )
+            response = "I hear you. Let me think about that more carefully."
+
+        return response
+
+    def get_diagnostic(self) -> dict:
+        """Full internal state for debugging / web UI display."""
+        last_grounding = (
+            self.interaction_log[-1]["grounding_score"]
+            if self.interaction_log else None
+        )
+        last_self_loop = (
+            self.interaction_log[-1]["self_loop_score"]
+            if self.interaction_log else None
+        )
+        return {
+            "limbic": {
+                "dopamine": self.limbic.state.dopamine,
+                "serotonin": self.limbic.state.serotonin,
+                "mood": self.limbic.state.mood,
+            },
+            "grounding": {
+                "score": last_grounding,
+                "self_loop": last_self_loop,
+            },
+            "brainstem": {
+                "crisis": self.brainstem.state.crisis_detected,
+                "cooldown": self.brainstem.state.cooldown_remaining,
+                "hostile_probes": self.brainstem.state.hostile_probe_count,
+                "interactions": self.brainstem.state.interaction_count,
+            },
+        }
+
+    def save_daily_trajectory(self, date_str: str) -> None:
+        """
+        End-of-day: write full limbic trajectory to
+        memory/limbic_trajectory_{date}.json
+        for consumption by the night cycle's Lagrangian Judge.
+        """
+        path = Path(f"memory/limbic_trajectory_{date_str}.json")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.interaction_log, indent=2, default=str))
+        logger.info(
+            f"Daily trajectory saved: {path} "
+            f"({len(self.interaction_log)} interactions)"
+        )
