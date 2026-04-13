@@ -94,6 +94,13 @@ class EpisodicMemory:
     delta_S_exploration: Optional[float] = None  # generative entropy contribution
     lagrangian_local: Optional[float] = None    # ΔI_c − λ₁·ΔS_noise + λ₂·ΔS_expl
 
+    # v0.7: Grounding markers (from nervous system grounding scorer)
+    grounding_score: Optional[float] = None     # G ∈ [0,1] — world-directedness
+    self_loop_score: Optional[float] = None     # fraction self-referential sentences
+    entity_density: Optional[float] = None      # named entities per sentence
+    causal_density: Optional[float] = None      # causal connectives per sentence
+    actionability: Optional[float] = None       # concrete steps/resources/URLs
+
     # Consolidation status
     consolidated: bool = False
     consolidation_provider: Optional[str] = None
@@ -121,6 +128,11 @@ class EpisodicMemory:
             "delta_S_noise": self.delta_S_noise,
             "delta_S_exploration": self.delta_S_exploration,
             "lagrangian_local": self.lagrangian_local,
+            "grounding_score": self.grounding_score,
+            "self_loop_score": self.self_loop_score,
+            "entity_density": self.entity_density,
+            "causal_density": self.causal_density,
+            "actionability": self.actionability,
             "consolidated": self.consolidated,
             "consolidation_provider": self.consolidation_provider,
             "meaning_extracted": self.meaning_extracted,
@@ -151,6 +163,11 @@ class EpisodicMemory:
             delta_S_noise=d.get("delta_S_noise"),
             delta_S_exploration=d.get("delta_S_exploration"),
             lagrangian_local=d.get("lagrangian_local"),
+            grounding_score=d.get("grounding_score"),
+            self_loop_score=d.get("self_loop_score"),
+            entity_density=d.get("entity_density"),
+            causal_density=d.get("causal_density"),
+            actionability=d.get("actionability"),
             consolidated=d.get("consolidated", False),
             consolidation_provider=d.get("consolidation_provider"),
             meaning_extracted=d.get("meaning_extracted"),
@@ -366,6 +383,17 @@ class WeightAdaptation:
 
 
 @dataclass
+class GroundingAnalysis:
+    """v0.7: Grounding capacity bound analysis from the Judge."""
+    mean_grounding: float = 0.0
+    mean_self_loop: float = 0.0
+    grounding_discounted_turns: List[str] = field(default_factory=list)
+    effective_Ic_integral: float = 0.0
+    raw_Ic_integral: float = 0.0
+    grounding_penalty_ratio: float = 0.0
+
+
+@dataclass
 class JudgmentResult:
     """
     Complete output from the nightly Lagrangian Judge.
@@ -381,6 +409,9 @@ class JudgmentResult:
     trajectory_assessment: str = ""
     weight_adaptation: WeightAdaptation = field(default_factory=WeightAdaptation)
     recommended_for_finetuning: bool = False
+
+    # v0.7: Grounding capacity bound
+    grounding_analysis: GroundingAnalysis = field(default_factory=GroundingAnalysis)
 
     # v0.5: Teleological component
     j_future: float = 0.5
@@ -424,6 +455,14 @@ class JudgmentResult:
                 "rationale": self.weight_adaptation.rationale,
             },
             "recommended_for_finetuning": self.recommended_for_finetuning,
+            "grounding_analysis": {
+                "mean_grounding": self.grounding_analysis.mean_grounding,
+                "mean_self_loop": self.grounding_analysis.mean_self_loop,
+                "grounding_discounted_turns": self.grounding_analysis.grounding_discounted_turns,
+                "effective_Ic_integral": self.grounding_analysis.effective_Ic_integral,
+                "raw_Ic_integral": self.grounding_analysis.raw_Ic_integral,
+                "grounding_penalty_ratio": self.grounding_analysis.grounding_penalty_ratio,
+            },
             "j_future": self.j_future,
             "blended_fertility": self.blended_fertility,
             "_provider": self.provider,

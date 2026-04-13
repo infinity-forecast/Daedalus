@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import Counter
 from datetime import datetime, date
 from pathlib import Path
+from statistics import mean
 from typing import Optional
 
 import yaml
@@ -141,6 +143,20 @@ class NightlyConsolidation:
         # Save old identity for delta computation
         old_identity = self.identity.as_dict().copy()
 
+        # ── Phase 3b: Load limbic trajectory (v0.7) ──
+        limbic_summary = self._load_limbic_trajectory(target_date)
+        if limbic_summary:
+            logger.info(
+                f"Phase 3b: Limbic trajectory loaded — "
+                f"{limbic_summary['total_interactions']} interactions, "
+                f"mean_grounding={limbic_summary['mean_grounding']:.3f}"
+            )
+        else:
+            logger.info("Phase 3b: No limbic trajectory found for today")
+
+        # ── Phase 3c: Enrich episodes with grounding scores (v0.7) ──
+        self._enrich_episodes_grounding(episodes, limbic_summary)
+
         # ── Phase 4: Lagrangian Judge ──
         logger.info("Phase 4: EECF Lagrangian Judge evaluation")
         judgment = await self.judge.evaluate(
@@ -148,6 +164,7 @@ class NightlyConsolidation:
             meanings=meanings,
             current_identity=self.identity.as_dict(),
             day_count=day_count,
+            limbic_summary=limbic_summary,
         )
 
         status["lagrangian_integral"] = judgment.daily_lagrangian_integral
@@ -166,6 +183,8 @@ class NightlyConsolidation:
             meanings=meanings,
             current_identity=self.identity.as_dict(),
             day_count=day_count,
+            grounding_analysis=judgment.grounding_analysis,
+            limbic_summary=limbic_summary,
         )
 
         blended = self.judge.compute_blended_fertility(judgment, j_future)
@@ -465,6 +484,91 @@ CRITICAL YAML FORMATTING RULES:
         logger.error(f"All YAML parse attempts failed for identity evolution response.")
         return None
 
+    def _load_limbic_trajectory(self, target_date: date) -> Optional[dict]:
+        """
+        v0.7: Load the day's limbic trajectory from the nervous system
+        and compute a summary for the Judge.
+        """
+        date_str = str(target_date)
+        trajectory_path = Path(f"memory/limbic_trajectory_{date_str}.json")
+        if not trajectory_path.exists():
+            return None
+
+        try:
+            with open(trajectory_path) as f:
+                limbic_data = json.load(f)
+
+            if not limbic_data:
+                return None
+
+            grounding_scores = [
+                e["grounding_score"] for e in limbic_data
+                if e.get("grounding_score") is not None
+            ]
+
+            return {
+                "total_interactions": len(limbic_data),
+                "mean_dopamine": mean([e["dopamine"] for e in limbic_data]),
+                "mean_serotonin": mean([e["serotonin"] for e in limbic_data]),
+                "mean_grounding": mean(grounding_scores) if grounding_scores else 0.5,
+                "mood_distribution": dict(Counter(e["mood"] for e in limbic_data)),
+                "crisis_events": sum(1 for e in limbic_data if e.get("crisis")),
+                "dopamine_trend": limbic_data[-1]["dopamine"] - limbic_data[0]["dopamine"],
+                "serotonin_trend": limbic_data[-1]["serotonin"] - limbic_data[0]["serotonin"],
+            }
+        except Exception as e:
+            logger.warning(f"Failed to load limbic trajectory: {e}")
+            return None
+
+    def _enrich_episodes_grounding(
+        self, episodes, limbic_summary: Optional[dict]
+    ) -> None:
+        """
+        v0.7: For episodes that lack grounding scores (e.g. stored before v0.7,
+        or when the nervous system was not active), retroactively compute them
+        using the grounding scorer.
+        """
+        missing = [ep for ep in episodes if ep.grounding_score is None]
+        if not missing:
+            return
+
+        logger.info(
+            f"Enriching {len(missing)}/{len(episodes)} episodes with grounding scores"
+        )
+
+        try:
+            from core.grounding import compute_grounding_score
+            core_embedding = self.core.get_embedding()
+            embedder = self.memory.embedder
+            if core_embedding is None or embedder is None:
+                logger.warning(
+                    "Core embedding or embedder not available; skipping enrichment"
+                )
+                return
+        except (ImportError, AttributeError) as e:
+            logger.warning(f"Grounding scorer not available: {e}; skipping enrichment")
+            return
+
+        for ep in missing:
+            if not ep.daedalus_response:
+                continue
+            try:
+                result = compute_grounding_score(
+                    response_text=ep.daedalus_response,
+                    user_input=ep.human_utterance,
+                    constitutional_core_embedding=core_embedding,
+                    embedder=embedder,
+                )
+                ep.grounding_score = result.get("grounding_score", 0.5)
+                ep.self_loop_score = result.get("self_loop_score", 0.0)
+                ep.entity_density = result.get("entity_density", 0.0)
+                ep.causal_density = result.get("causal_density", 0.0)
+                ep.actionability = result.get("actionability", 0.0)
+            except Exception as e:
+                logger.debug(f"Grounding score failed for {ep.id[:8]}: {e}")
+                ep.grounding_score = 0.5
+                ep.self_loop_score = 0.0
+
     def _log_transformation(self, status: dict, judgment) -> None:
         """Append to the transformation log."""
         self._transform_log.parent.mkdir(parents=True, exist_ok=True)
@@ -491,6 +595,12 @@ CRITICAL YAML FORMATTING RULES:
             "entropy": {
                 "S_noise": judgment.entropy_decomposition.total_S_noise,
                 "S_exploration": judgment.entropy_decomposition.total_S_exploration,
+            },
+            "grounding": {
+                "mean_grounding": judgment.grounding_analysis.mean_grounding,
+                "effective_Ic": judgment.grounding_analysis.effective_Ic_integral,
+                "raw_Ic": judgment.grounding_analysis.raw_Ic_integral,
+                "penalty_ratio": judgment.grounding_analysis.grounding_penalty_ratio,
             },
         }
         with open(self._transform_log, "a") as f:

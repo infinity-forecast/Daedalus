@@ -110,17 +110,27 @@ def compute_dopamine(
     else:
         response_diversity = 0.5
 
-    # GROUNDED DOPAMINE FORMULA:
+    # GROUNDED DOPAMINE FORMULA (v0.7 — depth vs loop aware):
     # Novelty is weighted by grounding. Novel + grounded = high dopamine.
     # Novel + self-referential = suppressed dopamine.
+    # BUT: high emotional engagement + response diversity = existential depth,
+    # not a loop. The loop_penalty should be modulated by response_diversity:
+    # repeating the same self-referential pattern = loop (penalize).
+    # Novel self-referential exploration = depth (attenuate penalty).
     grounded_novelty = novelty * (0.5 + 0.5 * G)
-    loop_penalty = self_loop * 0.3
+
+    # v0.7: Loop penalty is attenuated when response is novel and emotionally engaged.
+    # Pure loop: self_loop high + diversity low → full penalty.
+    # Genuine depth: self_loop high + diversity high → reduced penalty.
+    depth_attenuation = min(1.0, response_diversity + emotional)
+    loop_penalty = self_loop * 0.3 * (1.0 - 0.5 * depth_attenuation)
 
     raw = (
         0.30 * grounded_novelty
         + 0.25 * response_diversity
         + 0.20 * emotional
-        + 0.25 * G
+        + 0.15 * G               # v0.7: reduced from 0.25 — less raw grounding weight
+        + 0.10 * depth_attenuation  # v0.7: reward genuine engagement regardless of G
         - loop_penalty
     )
     return max(-1.0, min(1.0, (raw - 0.4) * 2.5))

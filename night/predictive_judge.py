@@ -24,7 +24,7 @@ from typing import List, Optional
 
 import yaml
 
-from core.data_types import JudgmentResult
+from core.data_types import JudgmentResult, GroundingAnalysis
 from core.soul_bridge import SoulBridge
 from core.constitutional_core import ConstitutionalCore
 
@@ -51,7 +51,21 @@ Ground your estimate in:
 1. The specific changes being made to the identity tonight
 2. The constitutional distance trajectory (are we approaching limits?)
 3. The open threads from the narrative arc
-4. The entropy balance (is the system exploring or collapsing?)"""
+4. The entropy balance (is the system exploring or collapsing?)
+
+GROUNDING CONTEXT (v0.7):
+
+You also receive a grounding analysis showing how much of today's İ_c was
+world-directed vs self-referential. A day with high raw İ_c but low γ_grounded
+is likely to produce lower fertility going forward — the model may have been
+rewarded for self-referential patterns that will persist into future interactions.
+
+Weight J_future downward when grounding_penalty_ratio is high.
+
+You may also receive a limbic trajectory summary showing the nervous system's
+affective state throughout the day. Declining dopamine with low grounding
+suggests the system was stuck in self-referential loops. Factor this into
+your fertility estimate."""
 
 
 class PredictiveJudge:
@@ -85,11 +99,16 @@ class PredictiveJudge:
         meanings: List[str],
         current_identity: dict,
         day_count: int,
+        grounding_analysis: Optional[GroundingAnalysis] = None,
+        limbic_summary: Optional[dict] = None,
     ) -> float:
         """
         Estimate J_future: the expected fertility of the next 3-5 days.
 
         Returns a float in [0, 1] representing predicted generative potential.
+
+        v0.7: Accepts grounding_analysis and limbic_summary to inform
+        the fertility estimate with world-directedness context.
         """
         identity_text = yaml.dump(
             current_identity, default_flow_style=False, allow_unicode=True
@@ -114,6 +133,33 @@ Tonight's judgment summary:
 
         meanings_text = "\n".join(f"  - {m}" for m in meanings) if meanings else "  (none)"
 
+        # v0.7: Grounding context block
+        grounding_block = ""
+        ga = grounding_analysis or judgment.grounding_analysis
+        if ga and ga.raw_Ic_integral != 0.0:
+            grounding_block = f"""
+
+Grounding analysis (v0.7):
+  Mean grounding (γ_grounded): {ga.mean_grounding:.3f}
+  Mean self-loop: {ga.mean_self_loop:.3f}
+  Raw İ_c integral: {ga.raw_Ic_integral:.3f}
+  Effective İ_c integral (post-discount): {ga.effective_Ic_integral:.3f}
+  Grounding penalty ratio: {ga.grounding_penalty_ratio:.3f}
+  Discounted turns: {len(ga.grounding_discounted_turns)}"""
+
+        # v0.7: Limbic trajectory block
+        limbic_block = ""
+        if limbic_summary:
+            limbic_block = f"""
+
+Limbic trajectory summary (v0.7):
+  Total interactions: {limbic_summary.get('total_interactions', 0)}
+  Mean dopamine: {limbic_summary.get('mean_dopamine', 0):.3f}
+  Mean serotonin: {limbic_summary.get('mean_serotonin', 0):.3f}
+  Dopamine trend: {limbic_summary.get('dopamine_trend', 0):+.3f}
+  Serotonin trend: {limbic_summary.get('serotonin_trend', 0):+.3f}
+  Crisis events: {limbic_summary.get('crisis_events', 0)}"""
+
         user_prompt = f"""Tonight's consolidated meanings:
 {meanings_text}
 
@@ -125,6 +171,8 @@ EECF scores:
   Honesty: {judgment.eecf_judgment.honesty:.2f}
   Vulnerability: {judgment.eecf_judgment.vulnerability:.2f}
   Openness: {judgment.eecf_judgment.openness:.2f}
+{grounding_block}
+{limbic_block}
 
 Estimate J_future: the expected fertility (Lagrangian integral)
 for the next 3-5 days, assuming tonight's identity update takes effect.
@@ -134,6 +182,7 @@ Consider:
 2. Are there unresolved threads that will generate productive tension?
 3. Is the identity moving toward or away from its growth edges?
 4. Will the constitutional distance (D_KL) allow continued exploration?
+5. Is the grounding penalty ratio high? If so, weight J_future downward.
 
 Output a single JSON object:
 {{
