@@ -15,7 +15,7 @@ __pycache__/
 dist/
 build/
 *.egg
-
+scripts/memory/episodes/*
 # Models (too large for git)
 models/lineage/
 models/inference/
