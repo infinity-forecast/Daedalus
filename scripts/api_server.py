@@ -91,6 +91,7 @@ async def startup_event():
         identity_manager=subsystems["identity"],
         memory_store=subsystems["memory"],
         constitutional_core=subsystems["constitutional_core"],
+        soul_memory=subsystems.get("soul_memory"),
     )
     app.state.nervous_system = nervous_system
     logger.info("Nervous system initialized (brainstem + limbic + cortex).")

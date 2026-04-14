@@ -48,6 +48,7 @@ class NervousSystem:
         identity_manager,
         memory_store,
         constitutional_core,
+        soul_memory=None,
     ):
         """
         All arguments should be the EXISTING instances from the current codebase.
@@ -59,6 +60,7 @@ class NervousSystem:
             identity_manager: The existing IdentityManager.
             memory_store: The existing MemoryStore (for salience scoring + episode storage).
             constitutional_core: The existing ConstitutionalCore instance.
+            soul_memory: The existing SoulMemory instance (narrative thread).
         """
         self.model = model
         self.tokenizer = tokenizer
@@ -66,6 +68,7 @@ class NervousSystem:
         self.identity_manager = identity_manager
         self.memory_store = memory_store
         self.constitutional_core = constitutional_core
+        self.soul_memory = soul_memory
 
         # Use the EXISTING constitutional core embedding -- already computed
         self.constitutional_core_embedding = constitutional_core._get_core_embedding()
@@ -116,10 +119,10 @@ class NervousSystem:
         brainstem_prefix = self.brainstem.get_prompt_prefix()
 
         # 3. CORTEX -> assemble prompt
-        # Get soul memory context if available
+        # Get soul memory context — the narrative thread of DAEDALUS's becoming
         soul_memory_context = ""
-        if hasattr(self.identity_manager, "get_soul_memory_context"):
-            soul_memory_context = self.identity_manager.get_soul_memory_context()
+        if self.soul_memory is not None:
+            soul_memory_context = self.soul_memory.assemble(mode="day")
 
         system_prompt = assemble_system_prompt(
             brainstem_prefix=brainstem_prefix,

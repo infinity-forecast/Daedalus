@@ -1,0 +1,11 @@
+{
+  "day": 1,
+  "timestamp": "2026-04-14T05:38:31.539353",
+  "j_future": 0.5,
+  "confidence": 0.0,
+  "generative_branches": [],
+  "constrained_branches": [],
+  "trajectory_prediction": "",
+  "provider": "deepseek",
+  "actual_next_day_integral": null
+}

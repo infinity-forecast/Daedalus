@@ -2,9 +2,9 @@
   "_meta": {
     "description": "DAEDALUS v0.5 — Complete software and model dependency manifest",
     "generated": "2026-04-07",
-    "python_env": "aurora-env (Anaconda)",
+    "python_env": "daedalus-env (Anaconda)",
     "python_version_required": ">=3.10",
-    "python_version_detected": "3.9.21 (upgrade required)",
+    "python_version_detected": "3.11.15",
     "hardware": {
       "gpus": 2,
       "gpu_model": "NVIDIA TITAN RTX",
@@ -244,7 +244,7 @@
         "package": "python",
         "version_required": ">=3.10",
         "version_detected": "3.9.21",
-        "notes": "⚠️  Current env (aurora-env) runs Python 3.9. DAEDALUS requires 3.10+ for union type hints (X | Y syntax) and match statements. Create a new conda env: conda create -n daedalus-env python=3.11",
+        "notes": "daedalus-env runs Python 3.11. All type hints and match statements are supported.",
         "status": "VERSION MISMATCH — upgrade required"
       }
     ]
