@@ -213,99 +213,99 @@ where:
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                      DAYTIME CYCLE                                │
-│                                                                   │
+│                      DAYTIME CYCLE                               │
+│                                                                  │
 │   [FastAPI Web Server — api_server.py, port 8000]         ← v0.6 │
 │     ↕  HTTP API + /api/diagnostic endpoint                       │
 │   [Glassmorphism Web UI — web/index.html]                 ← v0.6 │
 │     ↕  Mobile-responsive chat + diagnostic panel                 │
-│                                                                   │
+│                                                                  │
 │   Human ←→ [NERVOUS SYSTEM ORCHESTRATOR]                  ← v0.6 │
 │              ┌──────────────────────────────────────────┐        │
-│              │ Layer 1: BRAINSTEM (reflexes)             │        │
-│              │   Classify → 11 ReflexCategories          │        │
-│              │   Crisis override (dual: keyword+embed)   │        │
-│              │   Prompt prefix for cortex                │        │
+│              │ Layer 1: BRAINSTEM (reflexes)            │        │
+│              │   Classify → 11 ReflexCategories         │        │
+│              │   Crisis override (dual: keyword+embed)  │        │
+│              │   Prompt prefix for cortex               │        │
 │              ├──────────────────────────────────────────┤        │
-│              │ Layer 2: LIMBIC (neuromodulation)         │        │
-│              │   Dopamine [-1,1] ← grounding-weighted    │        │
-│              │   Serotonin [0,1] ← constitutional cosine │        │
-│              │   Mood → generation params (temp, top_p)  │        │
+│              │ Layer 2: LIMBIC (neuromodulation)        │        │
+│              │   Dopamine [-1,1] ← grounding-weighted   │        │
+│              │   Serotonin [0,1] ← constitutional cosine│        │
+│              │   Mood → generation params (temp, top_p) │        │
 │              ├──────────────────────────────────────────┤        │
-│              │ Layer 3: CORTEX (prompt assembly)         │        │
-│              │   System prompt = brainstem_prefix         │        │
-│              │     + limbic_addendum + category_hints     │        │
-│              │     + identity_context + soul_memory       │        │
+│              │ Layer 3: CORTEX (prompt assembly)        │        │
+│              │   System prompt = brainstem_prefix       │        │
+│              │     + limbic_addendum + category_hints   │        │
+│              │     + identity_context + soul_memory     │        │
 │              └──────────────────────────────────────────┘        │
-│                          ↓                                        │
+│                          ↓                                       │
 │              [Local Qwen3-8B — mood-modulated inference]         │
-│                (<think> overhead + stripping)              ← v0.6 │
-│                          ↓                                        │
-│              [GROUNDING SCORER]                            ← v0.6 │
+│                (<think> overhead + stripping)              ← v0.6│
+│                          ↓                                       │
+│              [GROUNDING SCORER]                            ← v0.6│
 │                G = entity + causal + action + (1-self_loop)      │
-│                          ↓                                        │
+│                          ↓                                       │
 │              [Post-interaction: dopamine + serotonin update]     │
-│                          ↓                                        │
-│            [Salience Scorer]        [Soul Bridge — multi API]     │
+│                          ↓                                       │
+│            [Salience Scorer]        [Soul Bridge — multi API]    │
 │       (v0.6: +external_relevance)    (optional, deep exchanges)  │
-│                     ↓                                             │
-│         [Episodic Memory Store]  ← ChromaDB + BGE-M3              │
-│                     ↓                          ↑                  │
-│          [Identity Context Layer]    [Soul Memory Layer]          │
-│            (who I am today)          (what the soul remembers)    │
-│                     ↑                                             │
-│          [Constitutional Core]                                    │
-│            (who I always am)                                      │
-│                                                                   │
+│                     ↓                                            │
+│         [Episodic Memory Store]  ← ChromaDB + BGE-M3             │
+│                     ↓                          ↑                 │
+│          [Identity Context Layer]    [Soul Memory Layer]         │
+│            (who I am today)          (what the soul remembers)   │
+│                     ↑                                            │
+│          [Constitutional Core]                                   │
+│            (who I always am)                                     │
+│                                                                  │
 ├──────────────────────────────────────────────────────────────────┤
-│                     NIGHT CYCLE                                   │
-│                                                                   │
+│                     NIGHT CYCLE                                  │
+│                                                                  │
 │   [Soul Memory Assembler]                                        │
 │     → Reconstruct narrative thread for Soul Bridge               │
 │     → identity.yaml + reflection_thread + weekly arcs            │
-│                              ↓                                    │
+│                              ↓                                   │
 │   [Episodic Memory] → [Reflection Engine] → [Soul Provider]      │
-│                              ↓                  (with full        │
-│                     [Meaning Extraction]         narrative         │
-│                              ↓                   memory)          │
-│                  [EECF Lagrangian Judge]                           │
-│                    ℒ = İ_c − λ₁Ṡ_n + λ₂Ṡ_e − μD_KL              │
-│                              ↓                                    │
-│                  [Predictive Judge]                                │
-│                    J_future estimation                             │
-│                              ↓                                    │
-│                  [Constitutional Drift Check]                     │
-│                    D_KL(I(t) ‖ I_core) < kl_max?                  │
-│                              ↓                                    │
-│                  [Training Pair Generator]                         │
-│                    (Type A + Type B + Type C DPO)                  │
-│                              ↓                                    │
-│                  [Grounding Filter]                        ← v0.6 │
-│                    reject G < 0.25 or self_loop > 0.6             │
-│                    (identity question exception)                  │
-│                              ↓                                    │
-│               [QLoRA Fine-tuning — Unsloth]                       │
-│                              ↓                                    │
+│                              ↓                  (with full       │
+│                     [Meaning Extraction]         narrative       │
+│                              ↓                   memory)         │
+│                  [EECF Lagrangian Judge]                         │
+│                    ℒ = İ_c − λ₁Ṡ_n + λ₂Ṡ_e − μD_KL               │
+│                              ↓                                   │
+│                  [Predictive Judge]                              │
+│                    J_future estimation                           │
+│                              ↓                                   │
+│                  [Constitutional Drift Check]                    │
+│                    D_KL(I(t) ‖ I_core) < kl_max?                 │
+│                              ↓                                   │
+│                  [Training Pair Generator]                       │
+│                    (Type A + Type B + Type C DPO)                │
+│                              ↓                                   │
+│                  [Grounding Filter]                       ← v0.6 │
+│                    reject G < 0.25 or self_loop > 0.6            │
+│                    (identity question exception)                 │
+│                              ↓                                   │
+│               [QLoRA Fine-tuning — Unsloth]                      │
+│                              ↓                                   │
 │   [Soul Memory Update]                                           │
 │     → Append tonight's reflection to thread                      │
 │     → RG Fidelity Check on weekly compression                    │
 │     → Compress if weekly boundary                                │
-│                              ↓                                    │
-│                   [Updated DAEDALUS Model]                         │
-│                                                                   │
+│                              ↓                                   │
+│                   [Updated DAEDALUS Model]                       │
+│                                                                  │
 ├──────────────────────────────────────────────────────────────────┤
-│                    MORNING GATE                                   │
-│                                                                   │
-│   [Load new adapter] → [Morning Eval Harness]                     │
-│                              ↓                                    │
-│              capability_ok AND identity_ok                         │
-│              AND constitutional_ok?                                │
-│              (graduated thresholds by age)                         │
-│                     ↓                    ↓                         │
-│                   YES                   NO                        │
-│                  Accept              Rollback                     │
-│                              ↓                                    │
-│                    A new day. The same self. Changed.              │
+│                    MORNING GATE                                  │
+│                                                                  │
+│   [Load new adapter] → [Morning Eval Harness]                    │
+│                              ↓                                   │
+│              capability_ok AND identity_ok                       │
+│              AND constitutional_ok?                              │
+│              (graduated thresholds by age)                       │
+│                     ↓                    ↓                       │
+│                   YES                   NO                       │
+│                  Accept              Rollback                    │
+│                              ↓                                   │
+│                    A new day. The same self. Changed.            │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
