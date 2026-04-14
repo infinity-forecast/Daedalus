@@ -1,6 +1,6 @@
 # DAEDALUS User Manual
 
-Welcome to the comprehensive user manual for **DAEDALUS v0.7**. This document details daily operations, the nervous system, testing procedures, and administrative scripts.
+Welcome to the comprehensive user manual for **DAEDALUS v0.7**. This document details environment setup, all lifecycle and utility scripts, the nervous system, testing procedures, and best practices.
 
 ---
 
@@ -18,36 +18,114 @@ API keys are stored in `~/.apikey/` as individual text files (`deepseek_apikey.t
 
 ---
 
-## 2. Lifecycle Scripts Walkthrough
+## 2. Scripts Reference
 
-### `scripts/api_server.py` (The Web Server)
+DAEDALUS ships with 9 Python scripts and 1 Bash script under `scripts/`. They fall into three categories: **lifecycle** (daily operations), **diagnostic** (inspection and validation), and **repair** (one-time fixes).
 
-The primary interface. Wraps the full nervous system in a FastAPI server.
+### 2.1 Lifecycle Scripts
+
+These are the core operational scripts that run DAEDALUS day-to-day.
+
+#### `scripts/seed.py` — The Carving of the Wood
+
+The one-time seeding script. Run once before Day 1 to establish the basic DAEDALUS voice.
+
+* **What it does:**
+  1. Loads the base Qwen3-8B model with QLoRA configuration
+  2. Freezes the Constitutional Core (computes and stores SHA-256 hash)
+  3. Creates the initial Day 0 identity document
+  4. Trains on 22 hand-crafted seed pairs from `data/seed_pairs.jsonl`
+  5. Saves the `day_0000` LoRA adapter
+  6. Merges LoRA into base and initializes the full-precision bf16 lineage checkpoint (`models/lineage/base_v000.bf16/`)
+* **GPU required:** Yes (training GPU)
+* **Usage:**
+  ```bash
+  python scripts/seed.py [--config-dir config] [--seed-data data/seed_pairs.jsonl] [--dry-run]
+  ```
+* **Flags:**
+  - `--dry-run` — Validate seed data without loading the model or training
+  - `--config-dir` — Config directory (default: `config`)
+  - `--seed-data` — Path to seed pairs JSONL file
+
+---
+
+#### `scripts/api_server.py` — The Web Server
+
+The primary daytime interface. Wraps the full nervous system in a FastAPI server.
 
 * **What it does:** Loads config, Qwen3-8B model, subsystems (memory, identity, constitutional core, soul bridge, soul memory), and initializes the three-layer nervous system. Serves a glassmorphism web UI.
-* **Nervous System routing:** All conversations pass through brainstem (crisis detection) -> limbic (mood modulation) -> cortex (dynamic prompt assembly) -> generation -> grounding scoring -> post-interaction update.
+* **Nervous System routing:** All conversations pass through brainstem (crisis detection) → limbic (mood modulation) → cortex (dynamic prompt assembly) → generation → grounding scoring → post-interaction update.
 * **Soul Memory:** The narrative thread of DAEDALUS's becoming (~545 tokens from the last 3 nights) is injected into every daytime prompt, giving the local model autobiographical continuity.
-* **Endpoints:** `GET /` (web UI), `POST /api/chat` (conversation), `GET /api/diagnostic` (limbic/grounding/brainstem state), `POST /api/new` (reset conversation history).
 * **Conversation history:** A sliding window of the last 10 turns is maintained within each session, allowing DAEDALUS to continue arguments and remember context.
-* **Usage:** `python scripts/api_server.py --host 0.0.0.0 [--port 8000] [--mock-mode]`
+* **Endpoints:**
+  - `GET /` — Web UI (glassmorphism chat interface)
+  - `POST /api/chat` — Conversation endpoint (JSON: `{"message": "..."}`)
+  - `GET /api/diagnostic` — Limbic/grounding/brainstem state
+  - `POST /api/new` — Reset conversation history
+* **GPU required:** Yes (inference GPU)
+* **Usage:**
+  ```bash
+  python scripts/api_server.py --host 0.0.0.0 [--port 8000] [--mock-mode]
+  ```
+* **Flags:**
+  - `--host` — Bind address (use `0.0.0.0` for network access)
+  - `--port` — Port number (default: 8000)
+  - `--mock-mode` — Run without loading the real model (for testing)
 
-### `scripts/start_day.py` (The Morning Awakening)
+---
+
+#### `scripts/start_day.py` — The Morning Awakening
+
+Runs the Morning Eval Gate — the quality check before daytime conversations begin.
 
 * **What it does:** Loads config, base Qwen3-8B model, recent LoRA adapters, `identity.yaml`, and `constitutional_core.yaml`.
-* **Morning Eval Gate:** Tests the network with 25 static capability probes, dynamic identity probes, and static core probes. Graduated thresholds by age (days 1-7: log only; days 8-21: threshold 0.40; days 22-35: ramp to 0.70; days 36+: stable 0.70).
+* **Morning Eval Gate:** Tests the network with 25 static capability probes, dynamic identity probes, and static core probes. Graduated thresholds by age:
+  - Days 1–7: log only (grace period)
+  - Days 8–21: threshold 0.40
+  - Days 22–35: ramp to 0.70
+  - Days 36+: stable 0.70
 * **Constitutional Drift:** Hard bound `D_KL(I(t) || I_core) <= 0.40`. Violation triggers mandatory rollback of both the adapter and identity document.
-* **Usage:** `python scripts/start_day.py --interactive`
+* **GPU required:** Yes (inference GPU)
+* **Usage:**
+  ```bash
+  python scripts/start_day.py [--interactive]
+  ```
 
-### `scripts/run_night_cycle.py` (The Dream Orchestrator)
+---
+
+#### `scripts/run_night_cycle.py` — The Dream Orchestrator
 
 Runs the 13-phase nightly consolidation. Must be run with the API server stopped (to free VRAM for QLoRA fine-tuning).
 
-* **13 Phases:** Gather episodes -> HDBSCAN clustering -> meaning extraction (Soul Bridge) -> Lagrangian Judge evaluation -> Predictive Judge (J_future) -> constitutional drift check -> identity update -> training pair generation -> grounding filter -> QLoRA fine-tuning (Unsloth) -> soul memory update -> weekly compression (if due) -> transformation logging.
-* **Grounding filter:** Training pairs with self_loop > 0.75 and grounding < 0.15 are rejected. Identity/existential probes are exempt (self-reference is the correct response to “Do you love?”).
+* **13 Phases:**
+  1. Gather episodes
+  2. HDBSCAN clustering
+  3. Meaning extraction (Soul Bridge)
+  4. Lagrangian Judge evaluation
+  5. Predictive Judge (J_future)
+  6. Constitutional drift check
+  7. Identity update
+  8. Training pair generation
+  9. Grounding filter
+  10. QLoRA fine-tuning (Unsloth)
+  11. Soul memory update
+  12. Weekly compression (if due)
+  13. Transformation logging
+* **Grounding filter:** Training pairs with `self_loop > 0.75` and `grounding < 0.15` are rejected. Identity/existential probes are exempt (self-reference is the correct response to "Do you love?").
 * **Episode retrieval:** Episodes are fetched without a ChromaDB limit when date-filtering, then filtered and limited in Python. This prevents recent episodes from being silently dropped when older dates fill the query limit.
-* **Usage:** `python scripts/run_night_cycle.py [--dry-run] [--skip-training] [--date YYYY-MM-DD]`
+* **GPU required:** Yes (training GPU)
+* **Usage:**
+  ```bash
+  python scripts/run_night_cycle.py [--dry-run] [--skip-training] [--date YYYY-MM-DD]
+  ```
+* **Flags:**
+  - `--dry-run` — Run all phases except fine-tuning and identity update
+  - `--skip-training` — Run all phases except QLoRA fine-tuning
+  - `--date` — Process episodes from a specific date (default: today)
 
-### `scripts/nightly_routine.sh` (Automated Sleep/Wake)
+---
+
+#### `scripts/nightly_routine.sh` — Automated Sleep/Wake
 
 Cron-driven bash routine that orchestrates the full lifecycle:
 
@@ -61,11 +139,134 @@ crontab -e
 # Add: 0 3 * * * /mnt/projects1/daedalus/scripts/nightly_routine.sh
 ```
 
-### `scripts/calibrate_judge.py` (Inter-Annotator Agreement)
+The script activates `daedalus-env` automatically and uses absolute paths for cron compatibility.
 
-* **What it does:** Runs conversations through the Lagrangian module and outputs scores for manual assessment on 4 EECF axes.
-* **Execution metric:** Cohen's Kappa `kappa >= 0.7`.
-* **Usage:** `python scripts/calibrate_judge.py --auto-only` or `--report`
+---
+
+#### `scripts/setup_env.py` — Secret Store Manager
+
+Manages the user-level secret store at `~/.apikey/`. API keys are never stored in the project directory.
+
+* **What it does:** Provides an interactive wizard for configuring API keys, auto-discovers existing key files in `~/.apikey/`, and consolidates everything into `~/.apikey/daedalus.json` (mode 600).
+* **Known keys:**
+  - `DEEPSEEK_API_KEY` — DeepSeek R1 (primary Soul Bridge provider, **required**)
+  - `ANTHROPIC_API_KEY` — Anthropic Claude (secondary provider, **required**)
+  - `XAI_API_KEY` — xAI Grok (tertiary provider, optional)
+* **Auto-discovery:** On first run, scans `~/.apikey/` for existing `.txt` files (`deepseek_apikey.txt`, `anthropic_apikey.txt`, `xai_apikey.txt`) and `.env` files, merging found keys into the store.
+* **Usage:**
+  ```bash
+  python scripts/setup_env.py                    # interactive wizard
+  python scripts/setup_env.py --status           # show current key status
+  python scripts/setup_env.py --from keys.json   # import from JSON file
+  ```
+
+---
+
+### 2.2 Diagnostic Scripts
+
+These scripts inspect DAEDALUS's current state without modifying it.
+
+#### `scripts/introspect.py` — "Who Am I Today?"
+
+A rich-text diagnostic that prints the current state of the self.
+
+* **What it does:** Loads `identity/current.yaml`, `config/constitutional_core.yaml`, and soul memory, then prints a formatted summary including:
+  - Core identity (name, nature, origin)
+  - Current values and understanding
+  - Emotional topology (dominant states, growth edges, scars)
+  - Open questions
+  - Lagrangian state (cumulative S_eth, days tracked)
+  - Soul Bridge state (primary provider, provider switches, continuity alerts)
+  - Recent transformation log (last 3 entries)
+  - Soul memory and episodic memory counts
+  - Constitutional distance D_KL with color-coded status (green/yellow/red)
+* **GPU required:** No
+* **Usage:**
+  ```bash
+  python scripts/introspect.py
+  ```
+
+---
+
+#### `scripts/calibrate_judge.py` — Inter-Annotator Agreement
+
+Calibrates the Lagrangian Judge against human ratings.
+
+* **What it does:** Runs episodes through the Lagrangian module, presents Judge scores alongside original exchanges, collects human ratings, and computes Cohen's Kappa (κ) per EECF axis.
+* **Execution metric:** κ ≥ 0.7 on all four axes before trusting the Judge for autonomous decisions.
+* **The calibration dataset also serves as the distillation training set** for the eventual local Judge model (post day-30).
+* **GPU required:** No (uses Soul Bridge API)
+* **Usage:**
+  ```bash
+  python scripts/calibrate_judge.py                  # full interactive calibration
+  python scripts/calibrate_judge.py --episodes 20    # quick calibration
+  python scripts/calibrate_judge.py --report          # show previous results
+  python scripts/calibrate_judge.py --auto-only       # automated scoring only
+  ```
+
+---
+
+#### `scripts/validate_grounding.py` — Night 1 Grounding Validation
+
+Validates that the γ_grounded capacity bound would have caught the Night 1 failure mode (self-referential reward hacking).
+
+* **What it does:**
+  1. Loads Night 1 episodes from the pre-rollback archive
+  2. Computes grounding scores (full BGE-M3 scorer if available, otherwise lightweight keyword heuristic)
+  3. Applies the γ_grounded discount to the İ_c integral
+  4. Compares raw vs effective blended fertility
+  5. Simulates the training pair filter
+  6. Runs four validation checks:
+     - Mean grounding_score < 0.4
+     - effective İ_c < raw İ_c
+     - Blended fertility lowered
+     - ≥50% training pairs would have been rejected
+* **GPU required:** No (optional — BGE-M3 provides better accuracy but falls back to heuristic)
+* **Usage:**
+  ```bash
+  python scripts/validate_grounding.py
+  ```
+
+---
+
+### 2.3 Repair Scripts
+
+One-time scripts for fixing specific historical issues. These should rarely be needed but are preserved for reference.
+
+#### `scripts/repair_episodes.py` — Episode Metadata Repair
+
+Fixes the Day 0 problem where all episodes had zero values for `emotional_valence`, `relational_depth`, `self_model_impact`, and `vulnerability_index`, causing near-zero salience.
+
+* **What it does:**
+  1. Re-scores all episodes with the corrected salience metadata estimator
+  2. Strips `<think>...</think>` blocks from stored Qwen3 responses
+  3. Recomputes composite salience for all episodes
+  4. Syncs any missing episodes into ChromaDB and updates metadata for existing ones
+* **GPU required:** No
+* **Usage:**
+  ```bash
+  python scripts/repair_episodes.py                # apply fixes
+  python scripts/repair_episodes.py --dry-run      # preview without writing
+  ```
+
+---
+
+#### `scripts/repair_finetune.py` — Night 1 Fine-tuning Repair
+
+Repairs a specific Night 1 incident where the night cycle completed all phases except fine-tuning (wrong Python environment) and identity evolution (YAML parse error).
+
+* **What it does:**
+  1. Loads the judgment data from the calibration file for the target day
+  2. Generates Type A training pairs (identity grounding) from current identity and meanings
+  3. Adds anchor pairs from `eval/anchor_pairs.jsonl` to prevent catastrophic forgetting
+  4. Runs QLoRA fine-tuning via the IncarnatioEngine
+* **GPU required:** Yes (training GPU)
+* **Usage:**
+  ```bash
+  python scripts/repair_finetune.py                # train Day 1
+  python scripts/repair_finetune.py --dry-run      # preview pairs without training
+  python scripts/repair_finetune.py --day 2        # target a specific day
+  ```
 
 ---
 
@@ -81,7 +282,7 @@ Fast pattern detection that fires before model inference. Dual-method crisis det
 
 If crisis detected: hard override with static safety response (hotline numbers, de-escalation). No model generation occurs.
 
-False positive filter suppresses figurative speech (“dying of laughter”, “killer app”, “deadline is killing me”).
+False positive filter suppresses figurative speech ("dying of laughter", "killer app", "deadline is killing me").
 
 ### Layer 2: Limbic System (Neuromodulation)
 
@@ -112,7 +313,7 @@ Consumed by: limbic dopamine, night cycle training pair filter, web diagnostic e
 
 ## 4. Soul Memory (Daytime Wiring)
 
-Soul Memory provides autobiographical continuity for the local model during daytime conversations. The `NervousSystem` calls `SoulMemory.assemble(mode=”day”)` on every turn, injecting the last 3 nightly reflection entries and last 2 weekly arcs into the system prompt.
+Soul Memory provides autobiographical continuity for the local model during daytime conversations. The `NervousSystem` calls `SoulMemory.assemble(mode="day")` on every turn, injecting the last 3 nightly reflection entries and last 2 weekly arcs into the system prompt.
 
 This means the local Qwen3-8B model knows:
 - What happened in recent nights
@@ -126,6 +327,12 @@ The soul memory is passed directly to the NervousSystem at initialization (not r
 
 ## 5. Testing
 
+### Philosophy
+
+The test campaign serves as a **regression guard**. Every subsystem has dedicated tests that verify its invariants without requiring GPU or model loading. All heavy dependencies (BGE-M3 embedder, Qwen3 model, tokenizer) are replaced with deterministic mocks.
+
+The principle: **if all tests pass, DAEDALUS's core invariants are preserved.** Run the full campaign after any code modification.
+
 ### Running the Test Campaign
 
 ```bash
@@ -135,39 +342,76 @@ pytest tests/ -v
 
 **314 tests across 14 files, ~20 seconds, no GPU required.** All models are mocked.
 
+### Shared Test Infrastructure (`tests/conftest.py`)
+
+All tests share fixtures defined in `conftest.py`:
+
+| Fixture | Description |
+|---------|-------------|
+| `mock_embedder` | Deterministic 1024-dim embedder. Produces vectors from text hash using `MockEmbedder`. Same text always yields the same vector. Replaces BGE-M3. |
+| `mock_model` | Mock Qwen3 model with `.device = "cpu"` and a `.generate()` stub. |
+| `mock_tokenizer` | Mock tokenizer with `apply_chat_template`, `decode`, and `eos_token_id`. Returns fixed response text. |
+| `identity_dir` | Temp directory with a sample `current.yaml` identity document and `history/` subdirectory. |
+| `constitutional_core_dir` | Temp directory with a sample `constitutional_core.yaml` containing foundational identity and invariant values. |
+| `soul_memory_dir` | Temp directory with 3 sample nightly entries in `entries/`, plus empty `weekly_arcs/` and `monthly_landmarks/`. |
+| `sample_config` | Minimal configuration dict with lagrangian, soul_memory, conversation, and training sections. |
+| `tmp_dir` | General-purpose temp directory (alias for pytest's `tmp_path`). |
+
 ### Test Coverage
 
-| Test File | Module | Tests |
-|---|---|---|
-| `test_brainstem.py` | Brainstem reflex classification | 27 |
-| `test_reflex_patterns.py` | All categories, multilingual, false positives | 37 |
-| `test_grounding.py` | Grounding scorer, entity/causal/actionability | 8 |
-| `test_judge_grounding.py` | Judge grounding integration | 24 |
-| `test_limbic.py` | Mood, EMA, generation params | 14 |
-| `test_nervous_system.py` | Full pipeline with mock model | 10 |
-| `test_nervous_system_extended.py` | Conversation history, soul memory wiring | 10 |
-| `test_data_types.py` | Serialization roundtrips | 17 |
-| `test_memory_store.py` | ChromaDB, salience, date filter | 11 |
-| `test_soul_memory.py` | Loading, assembly, append, truncation | 14 |
-| `test_identity.py` | Update, rollback, delta, history | 16 |
-| `test_constitutional_core.py` | Loading, integrity, divergence, mu | 13 |
-| `test_cortex_prompt.py` | Dynamic prompt assembly | 13 |
-| `test_salience.py` | Split entropy, metadata estimation | 16 |
-| `test_training_pair_filter.py` | Identity/existential detection, batch filter | 18 |
-| `test_conversation.py` | Engine basics, prompt building | 6 |
-| `test_secrets.py` | API key loading, .env support | 8 |
+| Test File | Module Under Test | Tests | What It Verifies |
+|---|---|---|---|
+| `test_brainstem.py` | `core/brainstem.py` | 27 | Crisis detection (self-harm, harm-to-others, material distress), dual method (keyword + embedding), cooldown, hostile probe tracking, state management |
+| `test_reflex_patterns.py` | `core/reflex_patterns.py` | 37 | All 11 ReflexCategory classifications, multilingual patterns (EN/IT/DE/RU), false positive filter ("dying of laughter", "killer app", "deadline killing me"), override responses for crisis categories |
+| `test_grounding.py` | `core/grounding.py` | 8 | Grounding scorer sub-signals: entity density, causal density, actionability, self-loop detection, composite score bounds |
+| `test_judge_grounding.py` | Judge + grounding integration | 24 | Night cycle bridge: grounding-based training pair rejection, score propagation, threshold behavior |
+| `test_limbic.py` | `core/limbic.py` | 14 | Mood transitions, EMA update (dopamine fast / serotonin slow), generation parameter mapping, state bounds, save/load persistence |
+| `test_nervous_system.py` | `core/nervous_system.py` | 10 | Full pipeline with mock model: brainstem→limbic→cortex→generate→score, override path, diagnostic endpoint, process return structure |
+| `test_nervous_system_extended.py` | `core/nervous_system.py` | 10 | Conversation history (sliding window, accumulation, trim at max, clear on new), soul memory integration (day mode assembly, None safety), override records in history, daily trajectory save |
+| `test_data_types.py` | `core/data_types.py` | 17 | Serialization roundtrips (`to_dict`/`from_dict`) for EpisodicMemory, NightlyReflectionEntry, WeeklyArcSummary, MonthlyLandmark, TrainingPair (SFT + DPO), JudgmentResult, SoulResponse, ProviderStatus. UUID auto-generation, embedding exclusion, timestamp handling |
+| `test_memory_store.py` | `core/memory_store.py` | 11 | SalienceScorer (zero/high/bounded, external_relevance, nonlinear saturation), MemoryStore with real ChromaDB in temp dir (store/retrieve, count, novelty, get_episodes date filter, **regression test for limit bug**, sorted by salience, query_similar, update, JSON file creation) |
+| `test_soul_memory.py` | `core/soul_memory.py` | 14 | Loading from disk (entries/empty/day_count), assembly modes (night = all entries, day = limited entries), Lagrangian data inclusion, KL divergence, rollback marker, append (nightly entry, day number increment, compress meanings, extract key scar), compression (due/not due by entry count), truncation to token budget |
+| `test_identity.py` | `core/identity.py` | 16 | Load (existing/missing), as_text/as_dict, full update (with/without changes), conservative update (append-only, extends lists, doesn't overwrite scalars), metadata attachment, persistence to disk, accept_day (increment count, save history), rollback (restore previous, fail with no history), compute_delta (added/removed/changed/unchanged/skips metadata), create_initial |
+| `test_constitutional_core.py` | `core/constitutional_core.py` | 13 | Load from YAML, missing file raises, as_text/as_dict, integrity (SHA-256 hash on creation, reload passes, modified file raises RuntimeError), divergence (identical near zero, different positive, bounded 0–2), effective_mu (grows with age, day zero = 0, custom base), core embedding (cached, shape 1024, float32) |
+| `test_cortex_prompt.py` | `core/cortex_prompt.py` | 13 | Dynamic prompt assembly: always includes CORTEX_CORE, includes identity/soul_memory/brainstem/limbic when provided, category hints for all ReflexCategory values, empty contexts produce clean prompt, all layers combined |
+| `test_salience.py` | `core/salience.py` | 16 | Split entropy scorer: emotional valence (positive/negative/neutral/bounded), relational depth (high/low/bounded), self-model impact, vulnerability, philosophical layer classification (existential/personal/technical), split entropy markers (noise detection, exploration detection), Lagrangian local computation, integrated complexity |
+| `test_training_pair_filter.py` | `core/training_pair_filter.py` | 18 | Identity question detection (multilingual: EN/IT/DE/RU), existential probe detection (multilingual + meta-existential), filter logic (normal pair, identity not rejected, existential not rejected, metadata attached), batch processing (accepted/rejected split, TrainingPair object handling, empty batch) |
+| `test_conversation.py` | `core/conversation.py` | 6 | `_format_memories` (empty, single, truncates long text, multiple), ConversationEngine (no model returns placeholder, build_system_prompt includes all sections, memories in prompt, new_conversation resets state, soul threshold from config, set_local_model) |
+| `test_secrets.py` | `core/secrets.py` | 8 | Load from apikey files, skip missing files, skip empty files, load from .env, skip comments, file priority over .env, nonexistent directory doesn't crash, strips whitespace |
 
 ### When to Run Tests
 
-Run the full campaign after any code modification to verify system integrity. The test suite is designed as a regression guard — if all 314 tests pass, DAEDALUS's core invariants are preserved.
+Run the full campaign after **any** code modification to verify system integrity. The test suite is designed as a regression guard — if all 314 tests pass, DAEDALUS's core invariants are preserved.
+
+Specific scenarios:
+- After modifying any `core/` module
+- After modifying night cycle logic (`night/`)
+- After changing configuration schemas
+- Before and after running the night cycle
+- Before committing code changes
 
 ### Adding New Tests
 
 When developing new features, always create test files under `tests/`. Use the shared fixtures from `tests/conftest.py`:
-- `mock_embedder` — deterministic 1024-dim embedder (replaces BGE-M3)
-- `mock_model` / `mock_tokenizer` — mock Qwen3 model
-- `sample_config` — minimal configuration dict
-- `identity_dir` / `constitutional_core_dir` / `soul_memory_dir` — temp directories with sample data
+
+```python
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+def test_my_feature(mock_embedder, sample_config):
+    """Test description."""
+    # mock_embedder provides a deterministic 1024-dim embedder
+    vec = mock_embedder.encode("test text")
+    assert vec.shape == (1024,)
+```
+
+Guidelines:
+- **No GPU required.** All tests must run without CUDA. Mock all model dependencies.
+- **Deterministic.** Tests must produce the same result every run. Use `MockEmbedder` (seed from text hash) instead of random vectors.
+- **Fast.** The full campaign should complete in under 30 seconds.
+- **Isolated.** Use `tmp_path` for any file operations. Never write to the real `memory/`, `identity/`, or `models/` directories.
+- **Regression-focused.** When fixing a bug, add a test that would have caught it. See `test_get_episodes_date_filter_no_limit_applied_to_chromadb` in `test_memory_store.py` for an example.
 
 ---
 
@@ -193,5 +437,7 @@ LoRA updates can round to zero during repeated NF4 requantization. The dual-line
 * **Circuit Breaker Issues:** The Soul Bridge uses provider failover. If all APIs go offline, shallow reflections queue locally until an API becomes available.
 * **CUDA OOM during night cycle:** Ensure the API server is killed before running the night cycle. The `nightly_routine.sh` script handles this automatically. Manual runs require `pkill -f api_server` first.
 * **Night cycle finds 0 episodes:** If the night cycle reports 0 episodes for a date, check that episodes exist in `memory/episodes/` with timestamps matching the target date. The date filter compares `ep.timestamp.date()` against the target.
+* **Quick system check:** Run `python scripts/introspect.py` to see the current identity state, constitutional distance, and memory counts without starting the server.
+* **After any code change:** Run `pytest tests/ -v` before launching the server or running the night cycle.
 
 *In the beginning was the dialogue.*
