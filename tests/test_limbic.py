@@ -73,19 +73,19 @@ def test_generation_params_engaged():
     state = LimbicState(dopamine=0.5, serotonin=0.8)
     params = get_generation_params(state)
     assert params["temperature"] == 0.8
-    assert params["max_new_tokens"] == 512
+    assert params["max_new_tokens"] == 2048
 
 def test_generation_params_guarded():
     state = LimbicState(dopamine=0.0, serotonin=0.2)
     params = get_generation_params(state)
     assert params["temperature"] == 0.4
-    assert params["max_new_tokens"] == 256
+    assert params["max_new_tokens"] == 1024
 
 def test_generation_params_withdrawn():
     state = LimbicState(dopamine=-0.7, serotonin=0.5)
     params = get_generation_params(state)
     assert params["temperature"] == 0.3
-    assert params["max_new_tokens"] == 128
+    assert params["max_new_tokens"] == 512
 
 
 # ── Self-referential loop drives dopamine negative ──

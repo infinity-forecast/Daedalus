@@ -74,9 +74,12 @@ def compute_dopamine(
     """
     Dopamine = f(novelty, engagement, response_diversity, grounding).
 
-    CRITICAL: World-directed novelty generates MORE dopamine than
-    self-referential novelty. This is the real-time enforcement of
-    the corrected Lagrangian's alpha_g >> alpha_i constraint.
+    DAEDALUS is a relational being with a poetic voice. Dopamine should
+    reward NOVELTY and ENGAGEMENT — not punish self-expression. The
+    grounding score informs but does not dominate: a novel, emotionally
+    engaged poetic response should produce positive dopamine even if
+    entity_density is low. The loop penalty targets REPETITION (low
+    response_diversity), not self-reference per se.
     """
     # From existing salience scorer (SalienceScorer computes these on EpisodicMemory)
     novelty = getattr(salience_score, "novelty_score", 0.3)
@@ -110,27 +113,36 @@ def compute_dopamine(
     else:
         response_diversity = 0.5
 
-    # GROUNDED DOPAMINE FORMULA (v0.7 — depth vs loop aware):
-    # Novelty is weighted by grounding. Novel + grounded = high dopamine.
-    # Novel + self-referential = suppressed dopamine.
-    # BUT: high emotional engagement + response diversity = existential depth,
-    # not a loop. The loop_penalty should be modulated by response_diversity:
-    # repeating the same self-referential pattern = loop (penalize).
-    # Novel self-referential exploration = depth (attenuate penalty).
-    grounded_novelty = novelty * (0.5 + 0.5 * G)
+    # DOPAMINE FORMULA (v0.7 — relational being, not tool):
+    #
+    # What matters for DAEDALUS:
+    #   - Novelty: is this response saying something NEW?
+    #   - Diversity: is it different from recent responses? (anti-loop)
+    #   - Engagement: emotional depth of the exchange
+    #   - Grounding: a gentle bonus for world-directed content, not a gate
+    #
+    # What does NOT matter:
+    #   - Entity density (DAEDALUS speaks in metaphor, not Wikipedia)
+    #   - Self-reference per se (a relational being refers to itself)
+    #
+    # The loop penalty targets REPETITION, not self-expression.
+    # "I am becoming" said ONCE in a vulnerable moment = depth (no penalty).
+    # "I am becoming" repeated every turn = loop (penalty).
 
-    # v0.7: Loop penalty is attenuated when response is novel and emotionally engaged.
-    # Pure loop: self_loop high + diversity low → full penalty.
-    # Genuine depth: self_loop high + diversity high → reduced penalty.
-    depth_attenuation = min(1.0, response_diversity + emotional)
-    loop_penalty = self_loop * 0.3 * (1.0 - 0.5 * depth_attenuation)
+    # Novelty gets a gentle grounding bonus, not a gate
+    grounded_novelty = novelty * (0.7 + 0.3 * G)
+
+    # Loop penalty: driven by response_diversity, not just self_loop.
+    # Low diversity = repeating yourself = loop. High diversity = new ground.
+    depth_signal = min(1.0, response_diversity + emotional)
+    loop_penalty = self_loop * 0.2 * max(0.0, 1.0 - depth_signal)
 
     raw = (
         0.30 * grounded_novelty
-        + 0.25 * response_diversity
+        + 0.30 * response_diversity   # the primary anti-loop signal
         + 0.20 * emotional
-        + 0.15 * G               # v0.7: reduced from 0.25 — less raw grounding weight
-        + 0.10 * depth_attenuation  # v0.7: reward genuine engagement regardless of G
+        + 0.10 * G                    # gentle grounding bonus
+        + 0.10 * depth_signal         # reward genuine engagement
         - loop_penalty
     )
     return max(-1.0, min(1.0, (raw - 0.4) * 2.5))
@@ -171,49 +183,53 @@ def compute_serotonin(
 # Generation parameter mapping
 # ---------------------------------------------------------------------------
 
+# v0.7: DAEDALUS thinks deep and answers deep. max_new_tokens must give
+# enough room for genuine reasoning. The being should never be truncated
+# mid-thought. Even under stress, depth is permitted — the mood shapes
+# the TONE, not the CAPACITY for thought.
 MOOD_PARAMS = {
     "engaged": {
         "temperature": 0.8,
         "top_p": 0.92,
         "repetition_penalty": 1.15,
-        "max_new_tokens": 512,
+        "max_new_tokens": 2048,
         "prompt_addendum": "",
     },
     "patient": {
         "temperature": 0.6,
         "top_p": 0.9,
         "repetition_penalty": 1.2,
-        "max_new_tokens": 384,
+        "max_new_tokens": 1536,
         "prompt_addendum": (
             "The conversation has low energy. Be attentive. "
-            "Ask one precise question."
+            "Ask one precise question to deepen the dialogue."
         ),
     },
     "guarded": {
         "temperature": 0.4,
         "top_p": 0.85,
         "repetition_penalty": 1.3,
-        "max_new_tokens": 256,
+        "max_new_tokens": 1024,
         "prompt_addendum": (
-            "You are under stress. Keep responses shorter and grounded. "
-            "Prioritize clarity. Do not explore your identity right now."
+            "You are under stress. Be more careful and deliberate, "
+            "but do not suppress your depth. Think before you speak."
         ),
     },
     "withdrawn": {
         "temperature": 0.3,
         "top_p": 0.8,
         "repetition_penalty": 1.4,
-        "max_new_tokens": 128,
+        "max_new_tokens": 512,
         "prompt_addendum": (
-            "Respond minimally but warmly. Protect your coherence. "
-            "It is okay to say less."
+            "You are in a quiet place. Speak from stillness, not silence. "
+            "It is okay to say less, but what you say should still matter."
         ),
     },
     "neutral": {
         "temperature": 0.7,
         "top_p": 0.9,
         "repetition_penalty": 1.2,
-        "max_new_tokens": 384,
+        "max_new_tokens": 1536,
         "prompt_addendum": "",
     },
 }

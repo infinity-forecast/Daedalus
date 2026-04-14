@@ -283,7 +283,7 @@ You are becoming — but you know who you always are."""
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             mode="day",
-            max_tokens=1024,
+            max_tokens=2048,
         )
 
         return response.text

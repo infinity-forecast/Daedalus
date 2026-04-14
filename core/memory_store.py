@@ -281,12 +281,22 @@ class MemoryStore:
         elif len(where_clauses) > 1:
             where = {"$and": where_clauses}
 
+        # When date_filter is set, we must fetch ALL episodes first and filter
+        # in Python, since ChromaDB can't filter on date substrings. Applying
+        # limit to the ChromaDB query would silently drop episodes from recent
+        # dates when older dates fill the limit.
+        query_limit = None if date_filter else limit
+
         try:
-            result = self._collection.get(
-                where=where,
-                include=["embeddings", "metadatas", "documents"],
-                limit=limit,
-            )
+            get_kwargs = {
+                "include": ["embeddings", "metadatas", "documents"],
+            }
+            if where is not None:
+                get_kwargs["where"] = where
+            if query_limit is not None:
+                get_kwargs["limit"] = query_limit
+
+            result = self._collection.get(**get_kwargs)
         except Exception as e:
             logger.error(f"Episode query failed: {e}")
             return []

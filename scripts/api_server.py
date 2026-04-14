@@ -146,8 +146,11 @@ async def diagnostic():
 
 @app.post("/api/new")
 async def new_conversation():
-    if not getattr(app.state, "mock_mode", False) and app.state.engine:
-        app.state.engine.new_conversation()
+    if not getattr(app.state, "mock_mode", False):
+        if app.state.engine:
+            app.state.engine.new_conversation()
+        if app.state.nervous_system:
+            app.state.nervous_system.new_conversation()
     return {"status": "ok"}
 
 

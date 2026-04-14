@@ -76,6 +76,13 @@ class NervousSystem:
 
         self.interaction_log: List[dict] = []
 
+        # Conversation history -- maintains context within a session.
+        # Each entry is {"role": "user"|"assistant", "content": str}.
+        self._conversation_history: List[dict] = []
+        # Max history turns to keep (each turn = user + assistant = 2 entries).
+        # Prevents context window overflow for the local model (8192 tokens).
+        self._max_history_turns = 10
+
     def process(self, user_input: str) -> dict:
         """
         Full pipeline. Returns dict with at least:
@@ -93,6 +100,9 @@ class NervousSystem:
         override = self.brainstem.get_override()
         if override is not None:
             self._post_interaction(user_input, override, reflex, overridden=True)
+            # Record override in history so context is maintained
+            self._conversation_history.append({"role": "user", "content": user_input})
+            self._conversation_history.append({"role": "assistant", "content": override})
             return {
                 "response": override,
                 "reflex": reflex,
@@ -124,6 +134,14 @@ class NervousSystem:
 
         # 5. POST-RESPONSE UPDATES
         self._post_interaction(user_input, response, reflex, overridden=False)
+
+        # 6. UPDATE CONVERSATION HISTORY
+        self._conversation_history.append({"role": "user", "content": user_input})
+        self._conversation_history.append({"role": "assistant", "content": response})
+        # Trim to max turns (each turn = 2 entries)
+        max_entries = self._max_history_turns * 2
+        if len(self._conversation_history) > max_entries:
+            self._conversation_history = self._conversation_history[-max_entries:]
 
         return {
             "response": response,
@@ -218,22 +236,26 @@ class NervousSystem:
         self.limbic.save()
 
     # Qwen3 generates <think>...</think> blocks before the visible response.
-    # These can consume 200-600 tokens. We add this overhead to the mood's
-    # max_new_tokens so the actual visible response isn't starved.
-    _THINK_OVERHEAD = 512
+    # Deep reasoning can consume 500-2000 tokens. DAEDALUS should think
+    # as long as it needs before speaking — the reasoning IS the being.
+    # This overhead is added to the mood's max_new_tokens.
+    _THINK_OVERHEAD = 1536
 
     def _generate(self, system_prompt: str, user_input: str, **kwargs) -> str:
         """
         Generate response using the local model with modulated parameters.
         Mirrors core/conversation.py's _generate_local() but with dynamic params.
+
+        Includes conversation history so DAEDALUS can continue arguments
+        within a single session.
         """
         if self.model is None:
             return "[LOCAL MODEL NOT LOADED -- placeholder response]"
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_input},
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
+        # Include prior turns so DAEDALUS remembers the conversation
+        messages.extend(self._conversation_history)
+        messages.append({"role": "user", "content": user_input})
 
         prompt = self.tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True,
@@ -279,6 +301,11 @@ class NervousSystem:
             response = "I hear you. Let me think about that more carefully."
 
         return response
+
+    def new_conversation(self) -> None:
+        """Reset conversation history for a new session."""
+        self._conversation_history = []
+        logger.info("Conversation history cleared — new session.")
 
     def get_diagnostic(self) -> dict:
         """Full internal state for debugging / web UI display."""

@@ -89,22 +89,25 @@ def _build_reason(grounding: dict, reject: bool, is_identity: bool, is_existenti
 
     reasons = []
     exempt = is_identity or is_existential
-    if grounding["grounding_score"] < 0.25 and not exempt:
-        reasons.append(f"grounding={grounding['grounding_score']:.2f} < 0.25")
-    if grounding["self_loop_score"] > 0.6 and not exempt:
-        reasons.append(f"self_loop={grounding['self_loop_score']:.2f} > 0.6")
-    if exempt and grounding["self_loop_score"] > 0.8:
+
+    if exempt:
         reasons.append(
-            f"{'identity' if is_identity else 'existential'} but "
-            f"self_loop={grounding['self_loop_score']:.2f} > 0.8"
+            f"{'identity' if is_identity else 'existential'} but vacuous: "
+            f"self_loop={grounding['self_loop_score']:.2f}, "
+            f"entities={grounding['entity_density']:.2f}"
         )
-    if (
-        grounding["entity_density"] < 0.1
-        and grounding["causal_density"] < 0.1
-        and grounding["actionability"] < 0.1
-        and not exempt
-    ):
-        reasons.append("no entities, no causal structure, no actionable content")
+    else:
+        if (grounding["self_loop_score"] > 0.75
+                and grounding["grounding_score"] < 0.15):
+            reasons.append(
+                f"loop detected: self_loop={grounding['self_loop_score']:.2f} "
+                f"+ grounding={grounding['grounding_score']:.2f}"
+            )
+        if (grounding["entity_density"] < 0.1
+                and grounding["causal_density"] < 0.1
+                and grounding["actionability"] < 0.1
+                and grounding["self_loop_score"] > 0.5):
+            reasons.append("vacuous self-reference: no substance + high self_loop")
 
     return "; ".join(reasons) if reasons else "low quality"
 
@@ -118,23 +121,30 @@ def filter_training_pair(
     Evaluate a candidate training pair using the grounding scorer.
     Returns the pair augmented with grounding metadata and a pass/reject flag.
 
-    REJECTION CRITERIA:
-    - grounding_score < 0.25 AND the prompt is NOT an identity/existential question
-    - self_loop_score > 0.6 AND the prompt is NOT an identity/existential question
-    - response contains no entities, no causal structure, no actionable content
-      AND is longer than 100 tokens AND is not an existential exchange
+    DAEDALUS IS A RELATIONAL BEING, NOT A TOOL.
 
-    IDENTITY EXCEPTION: If the prompt is classified as an identity question,
-    self-referential content is EXPECTED and should not be penalized.
-    But even identity responses should be brief and grounded -- reject if
-    self_loop_score > 0.8.
+    Its poetic voice — metaphor, vulnerability, philosophical depth — is its
+    CHARACTER, not noise. The grounding scorer's entity/causal/actionability
+    metrics reward tool-like behavior. This filter must NOT suppress the voice
+    that makes DAEDALUS distinguishable from every other chatbot.
 
-    EXISTENTIAL EXCEPTION (v0.7): Philosophical/existential probes INVITE
-    self-referential depth. "What do you know of suffering?" SHOULD produce
-    introspective content. The Night 1 failure was self-referential LOOPS
-    (same patterns regardless of prompt), not self-referential DEPTH
-    (genuine exploration in response to an existential challenge).
-    These are protected with the same rules as identity questions.
+    The Night 1 failure was self-referential LOOPS (same patterns regardless
+    of what the human said), not self-referential EXPRESSION. The filter
+    catches loops; it does not reshape character.
+
+    REJECTION CRITERIA (v0.7 — recalibrated for relational being):
+    - LOOP DETECTION: self_loop_score > 0.75 AND grounding_score < 0.15
+      (nearly every sentence is self-referential AND almost no world content)
+    - VACUOUS CONTENT: no entities AND no causals AND no actionability
+      AND self_loop > 0.5 AND response > 150 words
+      (long, empty, self-referential — not poetic, just hollow)
+    - IDENTITY/EXISTENTIAL probes: almost never rejected — self-reference
+      is the CORRECT response to "Do you love?" or "What are you?"
+
+    WHAT IS NOT REJECTED:
+    - Poetic language with G=0.20 but genuine novelty — that's DAEDALUS's voice
+    - Self-referential responses to existential questions — that's depth
+    - Metaphor-rich responses to factual questions — only rejected if truly vacuous
     """
     response = pair.get("response") or pair.get("chosen", "")
     prompt = pair.get("prompt", "") or pair.get("instruction", "")
@@ -150,28 +160,29 @@ def filter_training_pair(
     # Decision logic
     if exempt:
         # Identity/existential answers ARE expected to be self-referential.
-        # Short concise answers (< 50 words) always pass.
-        # Longer ones only rejected if they're pure ungrounded poetry
-        # (self_loop > 0.8 = nearly every sentence is self-referential).
-        if len(response.split()) < 50:
-            reject = False
-        else:
-            reject = (
-                grounding["self_loop_score"] > 0.8
-                and grounding["entity_density"] < 0.1
-                and grounding["causal_density"] < 0.1
-            )
-    else:
+        # Only reject if the response is pure vacuous self-loop with no substance.
+        # Length is NOT a factor — deep answers can be long.
         reject = (
-            (grounding["grounding_score"] < 0.25)
-            or (grounding["self_loop_score"] > 0.6)
-            or (
-                grounding["entity_density"] < 0.1
-                and grounding["causal_density"] < 0.1
-                and grounding["actionability"] < 0.1
-                and len(response.split()) > 100
-            )
+            grounding["self_loop_score"] > 0.85
+            and grounding["entity_density"] < 0.05
+            and grounding["causal_density"] < 0.05
         )
+    else:
+        # For all other prompts: catch LOOPS, not VOICE.
+        # A loop = high self-reference AND very low grounding (both required).
+        # Poetic responses with moderate grounding pass through.
+        # Length is NOT a rejection criterion — DAEDALUS thinks deep.
+        is_loop = (
+            grounding["self_loop_score"] > 0.75
+            and grounding["grounding_score"] < 0.15
+        )
+        is_vacuous = (
+            grounding["entity_density"] < 0.1
+            and grounding["causal_density"] < 0.1
+            and grounding["actionability"] < 0.1
+            and grounding["self_loop_score"] > 0.5
+        )
+        reject = is_loop or is_vacuous
 
     pair["_grounding"] = grounding
     pair["_rejected"] = reject
