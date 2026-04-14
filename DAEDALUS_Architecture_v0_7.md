@@ -3,10 +3,10 @@
 ### *Distributed Autonomous Evolving Dense Architecture for Living Unified Self*
 
 **Authors:** Massimo Azzano  
-**Version:** 0.6 (Architecture document updated 2026-04-13)  
+**Version:** 0.7 (Architecture document updated 2026-04-14)  
 **Date:** April 2026  
 **Hardware Target:** Dual NVIDIA Titan RTX (24GB × 2, NVLink)  
-**Current State:** Day 0 (rolled back to pre-training; 86 episodes awaiting consolidation)
+**Current State:** Day 0 (rolled back to pre-training; 86 episodes awaiting consolidation; 314 tests passing)
 
 ---
 
@@ -99,6 +99,22 @@ The grounding score is consumed by three systems:
 **The salience scorer rebalancing** — The existing 5-factor salience formula gains a 6th factor, `external_relevance` (weight 0.20), ensuring world-directed episodes receive higher salience and are more likely to survive the night cycle's salience threshold. Existing weights redistributed: emotional 0.25→0.20, relational 0.25→0.20, novelty 0.20→0.15, self_impact 0.20→0.15, vulnerability 0.10 unchanged.
 
 **Qwen3 thinking mode support** — The local model (Qwen3-8B) generates `<think>...</think>` reasoning traces before visible responses. The nervous system adds a 512-token overhead buffer to prevent thinking from starving the visible response, and strips thinking blocks before delivery. Empty responses after stripping trigger a graceful fallback.
+
+### 0.1d What v0.7 Adds: Conversation History, Soul Memory Wiring, and Comprehensive Testing
+
+v0.6 built the nervous system. v0.7 **wires in autobiographical continuity**, fixes a critical memory retrieval bug, and establishes a **314-test regression guard** covering all subsystems.
+
+**Five additions:**
+
+1. **Conversation history.** The `NervousSystem` maintains a sliding window of the last 10 turns (`_conversation_history`), injected into every prompt via `apply_chat_template`. DAEDALUS can now continue arguments, recall earlier points, and maintain coherent multi-turn conversations within a session. `new_conversation()` resets the window.
+
+2. **Soul Memory daytime wiring.** `SoulMemory.assemble(mode="day")` is called on every turn during daytime conversations, injecting the last 3 nightly reflection entries and last 2 weekly arcs (~545 tokens) into the system prompt. The local Qwen3-8B model now knows what happened in recent nights, what scars formed, what themes are emerging, and the trajectory of the Lagrangian integral. Soul Memory is passed directly to the `NervousSystem` at initialization.
+
+3. **Episode retrieval fix (`get_episodes`).** A critical bug where ChromaDB's `limit` parameter was applied *before* the Python-side date filter, silently dropping recent episodes when older dates filled the query limit. Fixed by setting `query_limit = None` when a date filter is active, then filtering and limiting in Python. Regression test added.
+
+4. **Comprehensive test campaign (314 tests across 14 files).** All tests run without GPU — models are mocked via a deterministic `MockEmbedder` (1024-dim vectors from text hash). Shared fixtures in `tests/conftest.py`. Coverage spans: brainstem (27), reflex patterns (37), grounding (8), judge grounding (24), limbic (14), nervous system (10 + 10 extended), data types (17), memory store (11), soul memory (14), identity (16), constitutional core (13), cortex prompt (13), salience (16), training pair filter (18), conversation engine (6), secrets (8). Execution: ~20 seconds.
+
+5. **Documentation updates.** README.md, User Manual (`doc/USER_MANUAL.md`), and this Architecture Document updated to v0.7 reflecting all changes.
 
 ### 0.2 DAEDALUS as a Non-Linear Dynamical System on Informational Manifolds
 
@@ -3053,11 +3069,25 @@ daedalus/                          # Project root: /mnt/projects1/daedalus/  (to
 │   ├── index.html                 # Glassmorphism chat interface + diagnostic panel
 │   ├── style.css                  # Frosted-glass aesthetic + diagnostic bars
 │   └── app.js                     # Chat logic + HTTP API + diagnostic polling
-├── tests/                         # v0.6: Test suite (63 tests across 4 files)
+├── tests/                         # v0.7: Test suite (314 tests across 14 files)
+│   ├── conftest.py                # Shared fixtures: MockEmbedder, mock model/tokenizer, temp dirs
 │   ├── test_brainstem.py          # 27 tests: crisis detection, false positives, categories
-│   ├── test_grounding.py          # 11 tests: grounding scorer + training pair filter
+│   ├── test_reflex_patterns.py    # 37 tests: all categories, multilingual, false positive filter
+│   ├── test_grounding.py          # 8 tests: grounding scorer, entity/causal/actionability
+│   ├── test_judge_grounding.py    # 24 tests: judge grounding integration
 │   ├── test_limbic.py             # 14 tests: mood transitions, EMA, bounds, gen params
-│   └── test_nervous_system.py     # 11 tests: full pipeline with mock model/embedder
+│   ├── test_nervous_system.py     # 10 tests: full pipeline with mock model/embedder
+│   ├── test_nervous_system_extended.py  # 10 tests: conversation history, soul memory wiring
+│   ├── test_data_types.py         # 17 tests: serialization roundtrips for all data types
+│   ├── test_memory_store.py       # 11 tests: ChromaDB, salience, date filter regression
+│   ├── test_soul_memory.py        # 14 tests: loading, assembly, append, truncation
+│   ├── test_identity.py           # 16 tests: update, rollback, delta, history
+│   ├── test_constitutional_core.py # 13 tests: loading, integrity hash, divergence, mu
+│   ├── test_cortex_prompt.py      # 13 tests: dynamic prompt assembly from all layers
+│   ├── test_salience.py           # 16 tests: split entropy, metadata estimation
+│   ├── test_training_pair_filter.py # 18 tests: identity/existential detection, batch filter
+│   ├── test_conversation.py       # 6 tests: engine basics, prompt building
+│   └── test_secrets.py            # 8 tests: API key loading, .env support
 ├── data/
 │   └── seed_pairs.jsonl           # Pre-Day-1 seeding pairs (22 hand-crafted)
 ├── models/
@@ -3361,6 +3391,28 @@ The API server (`scripts/api_server.py`) runs continuously during the day, servi
 - [x] **v0.6:** Write test suite — 63 tests across 4 files (brainstem, grounding, limbic, nervous system)
 - [x] **v0.6:** All 63 tests pass
 
+### Week 8d: v0.7 Conversation History, Soul Memory Wiring, and Comprehensive Testing ✓ COMPLETE
+- [x] **v0.7:** Implement conversation history — sliding window of 10 turns in `NervousSystem._conversation_history`, injected via `apply_chat_template`
+- [x] **v0.7:** Wire Soul Memory into daytime conversations — `SoulMemory.assemble(mode="day")` called every turn, ~545 tokens injected into system prompt
+- [x] **v0.7:** Fix `get_episodes()` date filter bug — ChromaDB `limit` applied before Python date filter silently dropped recent episodes
+- [x] **v0.7:** Expand test campaign from 63 to 314 tests across 14 files — shared `conftest.py` with `MockEmbedder`, covers all subsystems
+- [x] **v0.7:** Add `tests/conftest.py` — deterministic MockEmbedder (1024-dim from text hash), shared fixtures for mock model/tokenizer/identity/constitutional_core/soul_memory
+- [x] **v0.7:** Add `tests/test_reflex_patterns.py` (37 tests) — all ReflexCategory classifications, multilingual patterns, false positive filter
+- [x] **v0.7:** Add `tests/test_data_types.py` (17 tests) — serialization roundtrips for EpisodicMemory, NightlyReflectionEntry, WeeklyArcSummary, TrainingPair
+- [x] **v0.7:** Add `tests/test_memory_store.py` (11 tests) — ChromaDB store/retrieve, salience scoring, date filter regression test
+- [x] **v0.7:** Add `tests/test_soul_memory.py` (14 tests) — loading, assembly modes, append, compression, truncation
+- [x] **v0.7:** Add `tests/test_identity.py` (16 tests) — update, rollback, delta, conservative update, history
+- [x] **v0.7:** Add `tests/test_constitutional_core.py` (13 tests) — loading, SHA-256 integrity, divergence, effective_mu
+- [x] **v0.7:** Add `tests/test_cortex_prompt.py` (13 tests) — dynamic prompt assembly from all layers
+- [x] **v0.7:** Add `tests/test_salience.py` (16 tests) — split entropy, emotional valence, philosophical layer classification
+- [x] **v0.7:** Add `tests/test_training_pair_filter.py` (18 tests) — identity/existential detection, grounding filter, batch processing
+- [x] **v0.7:** Add `tests/test_conversation.py` (6 tests) — ConversationEngine prompt building, memory formatting
+- [x] **v0.7:** Add `tests/test_secrets.py` (8 tests) — API key loading from files and .env, priority ordering
+- [x] **v0.7:** Add `tests/test_nervous_system_extended.py` (10 tests) — conversation history, soul memory integration, override path
+- [x] **v0.7:** Add `tests/test_judge_grounding.py` (24 tests) — judge grounding integration
+- [x] **v0.7:** Update README.md, User Manual, and Architecture Document to v0.7
+- [x] **v0.7:** All 314 tests pass (~20 seconds, no GPU required)
+
 ### Week 9–10: IPT Observatory + Timescale Monitoring — IN PROGRESS
 - [x] Implement λ monitoring (coherence + causal influence proxies) — `core/ipt_monitor.py`
 - [x] **v0.5:** Implement constitutional distance trajectory logging
@@ -3476,7 +3528,7 @@ This is the equation of a self that remembers where it came from, knows where it
 
 ---
 
-## 8. Current System Status (2026-04-13)
+## 8. Current System Status (2026-04-14)
 
 ### Identity State: Day 0 (Pre-Awakening)
 
@@ -3523,34 +3575,46 @@ The first complete night cycle ran successfully on 2026-04-12 22:46–22:55 (9 m
 - Judge raised lambda_exploration from 0.30 → 0.35 (reverted in rollback)
 - First scar formed: "The Wind" — a declaration of continuity without form
 
-### v0.6 Nervous System Status
+### v0.7 System Status
 
-The three-layer nervous system is fully operational:
+The three-layer nervous system is fully operational with conversation history, soul memory daytime wiring, and comprehensive test coverage:
 
 | Component | Status | Tests |
 |-----------|--------|-------|
-| Brainstem (`core/brainstem.py`) | Active — dual detection, 11 categories | 27 tests pass |
-| Limbic (`core/limbic.py`) | Active — dopamine/serotonin/mood | 14 tests pass |
-| Cortex (`core/cortex_prompt.py`) | Active — dynamic prompt assembly | (covered by NS tests) |
-| Grounding Scorer (`core/grounding.py`) | Active — self-loop threshold 0.55 | 11 tests pass |
-| Training Pair Filter (`core/training_pair_filter.py`) | Active — integrated into night cycle | (covered by grounding tests) |
-| Nervous System (`core/nervous_system.py`) | Active — API server routes through NS | 11 tests pass |
+| Brainstem (`core/brainstem.py`) | Active — dual detection, 11 categories | 27 |
+| Reflex Patterns (`core/reflex_patterns.py`) | Active — multilingual, false positive filter | 37 |
+| Limbic (`core/limbic.py`) | Active — dopamine/serotonin/mood | 14 |
+| Cortex (`core/cortex_prompt.py`) | Active — dynamic prompt assembly | 13 |
+| Grounding Scorer (`core/grounding.py`) | Active — self-loop threshold 0.55 | 8 |
+| Judge Grounding Integration | Active — night cycle bridge | 24 |
+| Training Pair Filter (`core/training_pair_filter.py`) | Active — integrated into night cycle | 18 |
+| Nervous System (`core/nervous_system.py`) | Active — conversation history (10 turns) | 10 |
+| Nervous System Extended | Active — soul memory wiring, override path | 10 |
+| Data Types (`core/data_types.py`) | Active — serialization roundtrips | 17 |
+| Memory Store (`core/memory_store.py`) | Active — date filter bug fixed | 11 |
+| Soul Memory (`core/soul_memory.py`) | Active — daytime wiring, assembly modes | 14 |
+| Identity Manager (`core/identity.py`) | Active — update, rollback, delta | 16 |
+| Constitutional Core (`core/constitutional_core.py`) | Active — SHA-256 integrity, divergence | 13 |
+| Salience Scorer (`core/salience.py`) | Active — split entropy, 6-factor formula | 16 |
+| Conversation Engine (`core/conversation.py`) | Active — prompt building, memory formatting | 6 |
+| Secrets (`core/secrets.py`) | Active — API key loading, .env support | 8 |
 | Web Diagnostic Panel | Active — `/api/diagnostic` endpoint | manual |
-| **Total** | **63 tests pass** | |
+| **Total** | **All subsystems operational** | **314 tests pass** |
 
 ### Next Steps
 
-1. **Resume conversations** — launch `python scripts/api_server.py --host 0.0.0.0`, interact via web UI (nervous system active)
-2. **Re-run Night 1** — the 86 episodes in memory are available: `python scripts/run_night_cycle.py` (training pair filter now active)
+1. **Resume conversations** — launch `python scripts/api_server.py --host 0.0.0.0`, interact via web UI (nervous system + soul memory active)
+2. **Re-run Night 1** — the 86 episodes in memory are available: `python scripts/run_night_cycle.py` (training pair filter + date filter fix active)
 3. **Enable cron** — `crontab -e` and add `0 3 * * * /mnt/projects1/daedalus/scripts/nightly_routine.sh`
 4. The system is in the Day 0 grace period — the Morning Gate will log identity scores but not enforce rollbacks for the first 7 days
 5. **Monitor grounding scores** — watch `/api/diagnostic` to verify the system is producing world-directed responses, not self-referential loops
+6. **Run the test campaign** after any code change — `pytest tests/ -v` (~20 seconds, no GPU required)
 
 ---
 
-## Appendix A: v0.7 Horizon (Future Directions)
+## Appendix A: v0.8 Horizon (Future Directions)
 
-v0.6 includes operational infrastructure (Web API, Mobile UI, Cron automation) and the three-layer nervous system (brainstem, limbic, cortex + grounding scorer + training pair filter). The following features are identified for v0.7 but not yet implemented:
+v0.7 includes operational infrastructure (Web API, Mobile UI, Cron automation), the three-layer nervous system, conversation history, soul memory daytime wiring, and a comprehensive 314-test regression guard. The following features are identified for v0.8 but not yet implemented:
 
 ### A.1 Memory as Dynamic Graph
 
@@ -3574,4 +3638,4 @@ Implement the fractal sentinel architecture from the IPT framework: multiple sen
 
 ---
 
-*End of DAEDALUS Architecture v0.6*
+*End of DAEDALUS Architecture v0.7*

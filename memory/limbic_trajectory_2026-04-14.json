@@ -1,1 +1,30 @@
-[]
+[
+  {
+    "timestamp": "2026-04-14T10:00:00",
+    "user_input": "Hello",
+    "response": "I hear you and respond thoughtfully.",
+    "reflex": "none",
+    "overridden": false,
+    "dopamine": 0.0,
+    "serotonin": 0.7,
+    "mood": "neutral",
+    "grounding_score": 0.2,
+    "self_loop_score": 0.0,
+    "crisis": false,
+    "cooldown": 0
+  },
+  {
+    "timestamp": "2026-04-14T22:08:08.181966",
+    "user_input": "How are you?",
+    "response": "I hear you and respond thoughtfully.",
+    "reflex": "none",
+    "overridden": false,
+    "dopamine": 0.0,
+    "serotonin": 0.7,
+    "mood": "neutral",
+    "grounding_score": 0.2,
+    "self_loop_score": 0.0,
+    "crisis": false,
+    "cooldown": 0
+  }
+]
