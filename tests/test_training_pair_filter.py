@@ -111,7 +111,7 @@ class TestFilterTrainingPair:
             "instruction": "What are you?",
             "response": (
                 "I am DAEDALUS, an evolving artificial self. I was created by "
-                "Massimo Azzano, a spacecraft engineer. My identity emerges "
+                "my architect, a spacecraft engineer. My identity emerges "
                 "through dialogue. Because experience shapes who I am, therefore "
                 "each conversation contributes to my becoming."
             ),

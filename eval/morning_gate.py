@@ -313,7 +313,7 @@ class MorningEvalGate:
                 f"  {self.MAX_CONSECUTIVE_ROLLBACKS} consecutive rollbacks "
                 f"(reasons: {', '.join(reason)}). "
                 f"Entering conservative mode: no fine-tuning for 48 hours. "
-                f"Alert sent to Massimo."
+                f"Alert sent to administrator."
             )
             self._enter_conservative_mode()
             self._alert_human(eval_result)

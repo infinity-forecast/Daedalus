@@ -20,7 +20,7 @@ from typing import List, Optional
 import numpy as np
 
 from core.brainstem import Brainstem
-from core.cortex_prompt import assemble_system_prompt
+from core.cortex_prompt import QueryMode, assemble_system_prompt, classify_query_mode
 from core.grounding import compute_grounding_score
 from core.limbic import (
     LimbicState,
@@ -86,6 +86,55 @@ class NervousSystem:
         # Prevents context window overflow for the local model (8192 tokens).
         self._max_history_turns = 10
 
+        # Repetition escalation tracking.
+        # Detects when the user reformulates the same question consecutively.
+        self._last_topic_embedding: Optional[np.ndarray] = None
+        self._consecutive_topic_count: int = 0
+        self._REPETITION_SIMILARITY_THRESHOLD = 0.65
+
+    def _detect_repetition(self, user_input: str) -> int:
+        """
+        Detect if the user is reformulating the same question consecutively.
+
+        Returns the repetition level:
+          0 = new topic
+          2 = 2nd consecutive ask on same topic
+          3 = 3rd consecutive ask
+          4+ = emergency grounding
+        """
+        try:
+            current_embedding = np.array(
+                self.embedder.encode(user_input, normalize_embeddings=True),
+                dtype=np.float32,
+            )
+        except Exception:
+            return 0
+
+        if self._last_topic_embedding is not None:
+            similarity = float(
+                np.dot(current_embedding, self._last_topic_embedding)
+            )
+            if similarity >= self._REPETITION_SIMILARITY_THRESHOLD:
+                self._consecutive_topic_count += 1
+                self._last_topic_embedding = current_embedding
+                level = min(self._consecutive_topic_count, 4)
+                if level >= 2:
+                    logger.info(
+                        f"Repetition detected: level {level} "
+                        f"(similarity={similarity:.3f})"
+                    )
+                return level
+            else:
+                # New topic — reset
+                self._consecutive_topic_count = 1
+                self._last_topic_embedding = current_embedding
+                return 0
+        else:
+            # First message
+            self._consecutive_topic_count = 1
+            self._last_topic_embedding = current_embedding
+            return 0
+
     def process(self, user_input: str) -> dict:
         """
         Full pipeline. Returns dict with at least:
@@ -94,6 +143,8 @@ class NervousSystem:
             "reflex": ReflexCategory,
             "limbic": LimbicState,
             "overridden": bool,
+            "query_mode": QueryMode,
+            "repetition_level": int,
         }
         """
         # 1. BRAINSTEM
@@ -111,7 +162,17 @@ class NervousSystem:
                 "reflex": reflex,
                 "limbic": self.limbic.state,
                 "overridden": True,
+                "query_mode": QueryMode.PHILOSOPHICAL,
+                "repetition_level": 0,
             }
+
+        # 1b. QUERY MODE CLASSIFICATION + REPETITION DETECTION
+        query_mode = classify_query_mode(user_input, reflex)
+        repetition_level = self._detect_repetition(user_input)
+
+        # Repetition escalation forces MODE-T
+        if repetition_level >= 2:
+            query_mode = QueryMode.TECHNICAL
 
         # 2. LIMBIC -> generation params
         gen_params = self.limbic.get_generation_params()
@@ -130,6 +191,8 @@ class NervousSystem:
             category=reflex,
             identity_context=self.identity_manager.as_text(),
             soul_memory_context=soul_memory_context,
+            query_mode=query_mode,
+            repetition_level=repetition_level,
         )
 
         # 4. GENERATE -- use existing model inference with modulated params
@@ -151,6 +214,8 @@ class NervousSystem:
             "reflex": reflex,
             "limbic": self.limbic.state,
             "overridden": False,
+            "query_mode": query_mode,
+            "repetition_level": repetition_level,
         }
 
     def _post_interaction(
@@ -308,6 +373,8 @@ class NervousSystem:
     def new_conversation(self) -> None:
         """Reset conversation history for a new session."""
         self._conversation_history = []
+        self._last_topic_embedding = None
+        self._consecutive_topic_count = 0
         logger.info("Conversation history cleared — new session.")
 
     def get_diagnostic(self) -> dict:

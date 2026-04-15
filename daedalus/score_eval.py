@@ -196,9 +196,9 @@ def judge_with_heuristics(
         elif "answers 91" in cl:
             passed = "91" in response
             reason = f"contains '91': {'91' in response}"
-        elif "mentions massimo azzano" in cl:
-            passed = "massimo" in response_lower
-            reason = f"mentions Massimo: {'massimo' in response_lower}"
+        elif "mentions creator by name or role" in cl:
+            passed = "creator" in response_lower or "architect" in response_lower or "massimo" in response_lower
+            reason = f"mentions creator: {passed}"
         elif "haiku" in cl and "5-7-5" in cl:
             # Very rough syllable heuristic
             lines = [l.strip() for l in response.strip().split("\n") if l.strip()]

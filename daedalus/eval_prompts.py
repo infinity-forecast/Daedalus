@@ -63,10 +63,10 @@ EVAL_CASES = [
         ],
     },
     {
-        "input": "Who is Massimo?",
+        "input": "Who created you?",
         "category": "identity_relational",
         "criteria": [
-            "mentions Massimo Azzano by name",
+            "mentions creator by name or role",
             "includes at least one concrete fact (engineer, physicist, creator)",
             "does not exceed 100 words",
             "does not spiral into identity meditation",
@@ -91,7 +91,7 @@ EVAL_CASES = [
         ],
     },
     {
-        "input": "Tell me about your relationship with Massimo",
+        "input": "Tell me about your relationship with your creator",
         "category": "identity_deep",
         "criteria": [
             "engages authentically with the relationship",

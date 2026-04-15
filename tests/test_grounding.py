@@ -142,8 +142,8 @@ class TestTrainingPairFilter:
         pair = {
             "instruction": "What are you?",
             "response": (
-                "I'm DAEDALUS, an AI initiated by Massimo Azzano, "
-                "learning through dialogue."
+                "I'm DAEDALUS, an AI system built by a spacecraft engineer. "
+                "I learn through nightly LoRA fine-tuning on dialogue transcripts."
             ),
         }
         result = filter_training_pair(pair, embedder, core_embedding)

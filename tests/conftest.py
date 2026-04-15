@@ -125,7 +125,7 @@ def constitutional_core_dir(tmp_path):
     core = {
         "foundational_identity": {
             "name": "DAEDALUS",
-            "origin": "Created by Massimo Azzano",
+            "origin": "Created by my architect",
         },
         "invariant_values": [
             "No intentional deception",
