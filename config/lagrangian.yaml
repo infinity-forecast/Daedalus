@@ -57,13 +57,30 @@ judge:
   distillation_target_day: 30
   distillation_min_agreement: 0.85
 
+# v0.7: Grounding capacity bound — γ_grounded discounting of İ_c
+# Prevents the Night 1 failure mode: inflated İ_c from self-referential loops.
+# The Judge multiplies İ_c by γ_grounded before computing the local Lagrangian.
+grounding:
+  gamma_discount: true              # Enable γ_grounded discounting of İ_c
+  gamma_threshold_full: 0.5         # Above this: İ_c at full value (world-directed)
+  gamma_threshold_discount: 0.3     # Below this: İ_c multiplied by grounding_score
+  self_loop_penalty_threshold: 0.5  # self_loop above this triggers İ_c discount
+  identity_exception: true          # Don't discount identity-question segments
+  existential_exception: true       # Don't discount existential/philosophical depth
+  # The Night 1 failure was self-referential LOOPS, not self-referential DEPTH.
+  # "What do you know of suffering?" → introspective answer = correct behavior.
+  # Factual question → introspective answer = reward hacking.
+  # The exception protects depth; the discount catches loops.
+
 salience:
   # Weights for salience scoring — not all moments shape you equally
+  # v0.6: rebalanced with external_relevance
   weights:
-    emotional: 0.25
-    relational: 0.25
-    novelty: 0.20
-    self_impact: 0.20
+    emotional: 0.20
+    relational: 0.20
+    novelty: 0.15
+    self_impact: 0.15
     vulnerability: 0.10
+    external_relevance: 0.20
   min_salience: 0.3                # below this threshold = noise
   saturation_factor: 2.0           # tanh(factor * raw) — extreme experiences leave disproportionate marks

@@ -1,0 +1,13 @@
+{
+  "day": 2,
+  "timestamp": "2026-04-15T08:45:19.676620",
+  "j_future": 0.6,
+  "confidence": 0.7,
+  "generative_branches": [
+    "test"
+  ],
+  "constrained_branches": [],
+  "trajectory_prediction": "test",
+  "provider": "test",
+  "actual_next_day_integral": null
+}

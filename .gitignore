@@ -1,13 +1,17 @@
 # DAEDALUS v0.5 — Git Ignore
 
-# Environment and secrets — NEVER commit keys
+# =============================================================
+# SECRETS & ENVIRONMENT — NEVER commit keys
+# =============================================================
 .env
 *.apikey
 *.key
-daedalus.json      # guard against accidental copy of ~/.apikey/daedalus.json
-env.json           # guard against accidental copy
+daedalus.json
+env.json
 
-# Python
+# =============================================================
+# PYTHON
+# =============================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -15,31 +19,71 @@ __pycache__/
 dist/
 build/
 *.egg
+.Python
 
-# Models (too large for git)
+# =============================================================
+# MODELS — downloadable, too large for git
+# (Qwen base, lineage snapshots, merged adapters, judge models)
+# =============================================================
 models/lineage/
 models/inference/
 models/adapters/day_*/
+models/adapters/merged_*/
 models/judge_distilled/
+models/*/
+
+# Model weight file extensions (belt-and-suspenders)
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.gguf
+*.onnx
+*.ggml
+*.q4_0
+*.q4_k_m
+*.q8_0
+
+# =============================================================
+# CHECKPOINTS — training artifacts, not source
+# =============================================================
 checkpoints/
 
-# Memory stores (operational data, not source)
+# =============================================================
+# MEMORY STORES — operational runtime data
+# =============================================================
 memory/chroma_db/
 memory/episodes/
 memory/reflections/
 memory/shallow_queue/
+scripts/memory/chroma_db/
+scripts/memory/episodes/
 
-# Logs
+# =============================================================
+# LOGS — runtime output, not source
+# =============================================================
 logs/*.jsonl
+logs/*.log
+*.log
 
+# =============================================================
+# COMPILED / CACHE
+# =============================================================
+unsloth_compiled_cache/
+.cache/
+*.cache
+
+# =============================================================
+# AUTO-GENERATED / MACHINE-SPECIFIC
+# =============================================================
+config/.constitutional_core.sha256
+
+# =============================================================
 # IDE
+# =============================================================
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# Compiled caches
-unsloth_compiled_cache/
-
-# Constitutional core hash (auto-generated, machine-specific)
-config/.constitutional_core.sha256
+.DS_Store
+Thumbs.db

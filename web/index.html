@@ -6,7 +6,7 @@
     <title>Daedalus Chat</title>
     <!-- Modern Font -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=3">
 </head>
 <body>
     <div class="app-container">
@@ -30,6 +30,49 @@
                 </button>
             </div>
         </header>
+
+        <!-- Nervous System Diagnostic Panel -->
+        <div class="diagnostic-panel blur-effect" id="diagnostic-panel">
+            <div class="diag-header" id="diag-toggle">
+                <span class="diag-title">NERVOUS SYSTEM</span>
+                <span class="diag-mood" id="diag-mood">--</span>
+            </div>
+            <div class="diag-body" id="diag-body">
+                <div class="diag-row">
+                    <span class="diag-label">Dopamine</span>
+                    <div class="diag-bar-container bipolar">
+                        <div class="diag-bar-fill dopamine" id="bar-dopamine"></div>
+                        <div class="diag-bar-center"></div>
+                    </div>
+                    <span class="diag-value" id="val-dopamine">0.00</span>
+                </div>
+                <div class="diag-row">
+                    <span class="diag-label">Serotonin</span>
+                    <div class="diag-bar-container">
+                        <div class="diag-bar-fill serotonin" id="bar-serotonin"></div>
+                    </div>
+                    <span class="diag-value" id="val-serotonin">0.70</span>
+                </div>
+                <div class="diag-row">
+                    <span class="diag-label">Grounding</span>
+                    <div class="diag-bar-container">
+                        <div class="diag-bar-fill grounding" id="bar-grounding"></div>
+                    </div>
+                    <span class="diag-value" id="val-grounding">--</span>
+                </div>
+                <div class="diag-row">
+                    <span class="diag-label">Self-loop</span>
+                    <div class="diag-bar-container">
+                        <div class="diag-bar-fill selfloop" id="bar-selfloop"></div>
+                    </div>
+                    <span class="diag-value" id="val-selfloop">--</span>
+                </div>
+                <div class="diag-row diag-meta">
+                    <span id="diag-crisis" class="diag-badge hidden">CRISIS</span>
+                    <span class="diag-interactions" id="diag-interactions">0 interactions</span>
+                </div>
+            </div>
+        </div>
 
         <!-- Chat Area -->
         <main class="chat-container" id="chat-container">
@@ -63,6 +106,6 @@
         </footer>
     </div>
     
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=3"></script>
 </body>
 </html>

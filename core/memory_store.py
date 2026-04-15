@@ -49,24 +49,38 @@ class SalienceScorer:
     High salience = high deformation of the self-model.
 
     v0.5: Also computes split entropy markers for each episode.
+    v0.6: external_relevance factor added (grounding score).
+          Episodes about the real world get higher salience than
+          episodes of pure self-reflection.
     """
 
     def __init__(self, config: dict):
         salience_config = config.get("salience", {})
         weights = salience_config.get("weights", {})
+        # v0.6: rebalanced weights to accommodate external_relevance
         self.weights = {
-            "emotional": weights.get("emotional", 0.25),
-            "relational": weights.get("relational", 0.25),
-            "novelty": weights.get("novelty", 0.20),
-            "self_impact": weights.get("self_impact", 0.20),
+            "emotional": weights.get("emotional", 0.20),
+            "relational": weights.get("relational", 0.20),
+            "novelty": weights.get("novelty", 0.15),
+            "self_impact": weights.get("self_impact", 0.15),
             "vulnerability": weights.get("vulnerability", 0.10),
+            "external_relevance": weights.get("external_relevance", 0.20),
         }
         self.saturation_factor = salience_config.get("saturation_factor", 2.0)
 
-    def compute_salience(self, memory: EpisodicMemory) -> float:
+    def compute_salience(
+        self,
+        memory: EpisodicMemory,
+        external_relevance: float = 0.0,
+    ) -> float:
         """
         Compute composite salience score.
         Non-linear: extreme experiences leave disproportionate marks.
+
+        Args:
+            memory: The episodic memory to score.
+            external_relevance: Grounding score G from core/grounding.py [0, 1].
+                                World-directed episodes get higher salience.
         """
         raw = (
             self.weights["emotional"] * abs(memory.emotional_valence)
@@ -74,9 +88,10 @@ class SalienceScorer:
             + self.weights["novelty"] * memory.novelty_score
             + self.weights["self_impact"] * memory.self_model_impact
             + self.weights["vulnerability"] * memory.vulnerability_index
+            + self.weights["external_relevance"] * external_relevance
         )
 
-        # Saturate: tanh maps [0, ∞) → [0, 1) with disproportionate weight to extremes
+        # Saturate: tanh maps [0, inf) -> [0, 1) with disproportionate weight to extremes
         return float(np.tanh(self.saturation_factor * raw))
 
 
@@ -266,12 +281,22 @@ class MemoryStore:
         elif len(where_clauses) > 1:
             where = {"$and": where_clauses}
 
+        # When date_filter is set, we must fetch ALL episodes first and filter
+        # in Python, since ChromaDB can't filter on date substrings. Applying
+        # limit to the ChromaDB query would silently drop episodes from recent
+        # dates when older dates fill the limit.
+        query_limit = None if date_filter else limit
+
         try:
-            result = self._collection.get(
-                where=where,
-                include=["embeddings", "metadatas", "documents"],
-                limit=limit,
-            )
+            get_kwargs = {
+                "include": ["embeddings", "metadatas", "documents"],
+            }
+            if where is not None:
+                get_kwargs["where"] = where
+            if query_limit is not None:
+                get_kwargs["limit"] = query_limit
+
+            result = self._collection.get(**get_kwargs)
         except Exception as e:
             logger.error(f"Episode query failed: {e}")
             return []
@@ -293,7 +318,16 @@ class MemoryStore:
 
             # Date filter (post-query since ChromaDB metadata filtering is limited)
             if date_filter:
-                ep_date = ep.timestamp.date() if isinstance(ep.timestamp, datetime) else None
+                if isinstance(ep.timestamp, str):
+                    try:
+                        ep_date = datetime.fromisoformat(ep.timestamp).date()
+                    except ValueError:
+                        ep_date = None
+                elif isinstance(ep.timestamp, datetime):
+                    ep_date = ep.timestamp.date()
+                else:
+                    ep_date = None
+                    
                 if ep_date != date_filter:
                     continue
 

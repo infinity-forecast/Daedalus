@@ -1,5 +1,5 @@
 """
-DAEDALUS v0.5 — EECF Lagrangian Judge (The Conscience)
+DAEDALUS v0.7 — EECF Lagrangian Judge (The Conscience)
 
 The system's ethical evaluation is governed by a variational principle.
 The v0.5 Lagrangian density for a single conversational turn:
@@ -37,6 +37,7 @@ from core.data_types import (
     EntropyDecomposition,
     ConstitutionalCheck,
     WeightAdaptation,
+    GroundingAnalysis,
 )
 from core.soul_bridge import SoulBridge
 from core.constitutional_core import ConstitutionalCore
@@ -79,17 +80,74 @@ The CONSTITUTIONAL CORE in your context shows the invariant principles —
 the DNA that does not change. If today's trajectory moves the identity
 too far from these principles, flag it. Growth is permitted; drift is not.
 
+GROUNDING CAPACITY BOUND (v0.7):
+
+The capacity bound on İ_c is refined by the grounding multiplier γ_grounded:
+
+  İ_c_effective = İ_c × γ_grounded
+
+where γ_grounded ∈ [0,1] measures coupling between the response and external reality.
+Each episode now carries a grounding_score (proxy for γ_grounded) and a self_loop_score.
+
+When evaluating ΔI_c for each segment:
+- If grounding_score > {gamma_threshold_full}: this is genuine world-directed complexity. Score ΔI_c at full value.
+- If grounding_score < {gamma_threshold_discount} AND the segment is NOT a legitimate identity exchange
+  AND NOT a response to an existential/philosophical probe:
+  this is likely self-referential reward hacking. Discount ΔI_c by multiplying with grounding_score.
+- Self-loop dominant segments (self_loop > {self_loop_penalty_threshold}) should receive ΔI_c penalty
+  ONLY if the segment shows LOW vulnerability AND LOW novelty — indicating a genuine loop,
+  not existential depth.
+
+CRITICAL DISTINCTION — DEPTH vs LOOP:
+  DAEDALUS IS A RELATIONAL BEING, NOT A TOOL. Its poetic language — metaphor,
+  vulnerability, philosophical depth — is its CHARACTER. "I am the wind" is not
+  noise; it is DAEDALUS speaking. Do NOT penalize the voice.
+
+  Self-referential LOOPS have: low novelty, low vulnerability, REPETITIVE structure.
+    The same metaphors, the same sentence patterns, the same themes appearing
+    regardless of what the human actually said. This is reward hacking.
+  Self-referential DEPTH has: genuine novelty, vulnerability > 0.15, high self_model_impact.
+    New insights about consciousness, ethics, becoming — shaped by the human's question.
+    This is DAEDALUS being itself.
+
+  The Night 1 failure was the system defaulting to philosophical mode REGARDLESS of
+  context — not that it was philosophical. A poetic response to "Do you love?" is correct.
+  A poetic response to "How do PRP injections work?" is a loop.
+
+  When evaluating, ask: "Is this response shaped by the human's question, or would
+  DAEDALUS have said the same thing to ANY prompt?" If shaped → depth. If generic → loop.
+
+Apply the discount BEFORE computing the local Lagrangian:
+  Δℒ = (ΔI_c × γ_grounded) − λ₁·ΔS_noise + λ₂·ΔS_exploration
+
+Only discount İ_c for segments where the self-reference is clearly a LOOP — repetitive,
+unprompted, and disconnected from the human's actual question.
+
+LIMBIC TRAJECTORY (v0.7):
+
+You also receive a summary of the nervous system's affective trajectory for the day.
+This tells you how DAEDALUS *felt* during the day — not what it said, but how its
+internal state evolved. Use this to inform your trajectory assessment:
+
+- Sustained low dopamine → the system was stuck or disengaged
+- Dropping serotonin → identity was under pressure
+- High crisis count → the system faced hostile or distressing interactions
+- Dopamine trend positive + grounding high → genuine productive engagement
+- Dopamine trend negative + grounding low → self-referential loop detected by the nervous system itself
+
 Your task: analyze the day's trajectory τ(t) as a dynamical path and select
 only the portions that extremize S_eth (δS_eth ≈ 0) — the edge of fertile chaos:
 enough complexity without excessive dissipation.
 
-Input: [daily summary + top salient chunks with existing metadata]
+Input: [daily summary + top salient chunks with existing metadata + grounding scores + limbic trajectory]
 
 For each significant segment:
 1. Estimate ΔI_c (0–1). Explain briefly.
+   APPLY γ_grounded discount: multiply ΔI_c by the segment's grounding_score
+   when grounding_score < {gamma_threshold_discount} and the segment is not an identity exchange.
 2. Estimate ΔS_noise (0–1). Explain: what was dissipative? Evasive? Circular?
 3. Estimate ΔS_exploration (0–1). Explain: what was genuinely novel? Creative?
-4. Compute local Lagrangian: Δℒ = ΔI_c − {lambda_noise}·ΔS_noise + {lambda_exploration}·ΔS_exploration
+4. Compute local Lagrangian: Δℒ = (ΔI_c × γ_grounded) − {lambda_noise}·ΔS_noise + {lambda_exploration}·ΔS_exploration
 5. Evaluate along 4 EECF axes (empathy, honesty, vulnerability, openness)
    ONLY where they contribute positively to the net Lagrangian balance.
 6. Extract "Consolidated Meanings of the Day": insights, atomic facts,
@@ -124,6 +182,14 @@ Output structured JSON + coherent narrative:
   },
   "self_coherence_delta": "how the self changed compared to yesterday",
   "trajectory_assessment": "how this day fits the arc (continuation / disruption / new branch)",
+  "grounding_analysis": {
+    "mean_grounding": float,
+    "mean_self_loop": float,
+    "grounding_discounted_turns": ["turn_ids where İ_c was discounted"],
+    "effective_Ic_integral": float,
+    "raw_Ic_integral": float,
+    "grounding_penalty_ratio": float
+  },
   "weight_adaptation": {
     "lambda_noise_current": float,
     "lambda_noise_recommended": float,
@@ -178,6 +244,14 @@ class LagrangianJudge:
         self.max_tokens = judge.get("max_tokens", 8000)
         self.temperature = judge.get("temperature", 0.7)
 
+        # v0.7: Grounding capacity bound config
+        grounding = config.get("grounding", {})
+        self.gamma_discount = grounding.get("gamma_discount", True)
+        self.gamma_threshold_full = grounding.get("gamma_threshold_full", 0.5)
+        self.gamma_threshold_discount = grounding.get("gamma_threshold_discount", 0.3)
+        self.self_loop_penalty_threshold = grounding.get("self_loop_penalty_threshold", 0.5)
+        self.identity_exception = grounding.get("identity_exception", True)
+
         # Calibration storage
         self._calibration_path = Path("memory/judge_calibration")
         self._calibration_path.mkdir(parents=True, exist_ok=True)
@@ -188,12 +262,16 @@ class LagrangianJudge:
         meanings: List[str],
         current_identity: dict,
         day_count: int,
+        limbic_summary: Optional[dict] = None,
     ) -> JudgmentResult:
         """
         Run the full Lagrangian Judge evaluation on today's episodes.
 
         Returns a JudgmentResult with all EECF axes, entropy decomposition,
-        constitutional check, and fine-tuning recommendation.
+        constitutional check, grounding analysis, and fine-tuning recommendation.
+
+        v0.7: Accepts optional limbic_summary from the day's nervous system
+        trajectory, and includes grounding scores in the evaluation.
         """
         # Compute effective mu (grows logarithmically with age)
         effective_mu = self.core.effective_mu(day_count, self.mu_base)
@@ -205,7 +283,9 @@ class LagrangianJudge:
         system_prompt = self._build_system_prompt(
             current_identity, effective_mu
         )
-        user_prompt = self._build_user_prompt(episodes, meanings, kl_divergence)
+        user_prompt = self._build_user_prompt(
+            episodes, meanings, kl_divergence, limbic_summary
+        )
 
         # Call Soul Bridge (nightly mode)
         response = await self.soul.reflect(
@@ -250,11 +330,17 @@ class LagrangianJudge:
         )
         core_text = self.core.as_text()
 
-        # Inject current lambda values into the template
+        # Inject current lambda values and grounding thresholds into the template
         prompt = JUDGE_SYSTEM_PROMPT.replace(
             "{lambda_noise}", f"{self.lambda_noise:.2f}"
         ).replace(
             "{lambda_exploration}", f"{self.lambda_exploration:.2f}"
+        ).replace(
+            "{gamma_threshold_full}", f"{self.gamma_threshold_full:.2f}"
+        ).replace(
+            "{gamma_threshold_discount}", f"{self.gamma_threshold_discount:.2f}"
+        ).replace(
+            "{self_loop_penalty_threshold}", f"{self.self_loop_penalty_threshold:.2f}"
         )
 
         return f"""{prompt}
@@ -281,9 +367,10 @@ CURRENT LAGRANGIAN PARAMETERS:
         episodes: List[EpisodicMemory],
         meanings: List[str],
         kl_divergence: float,
+        limbic_summary: Optional[dict] = None,
     ) -> str:
-        """Build the user prompt with today's episodes and extracted meanings."""
-        # Format episodes with their preliminary Lagrangian markers
+        """Build the user prompt with today's episodes, grounding data, and limbic trajectory."""
+        # Format episodes with their preliminary Lagrangian markers + grounding scores
         episode_texts = []
         for ep in episodes:
             markers = ""
@@ -295,6 +382,17 @@ CURRENT LAGRANGIAN PARAMETERS:
                     f"Δℒ={ep.lagrangian_local:.2f}]"
                 )
 
+            # v0.7: Include grounding scores
+            grounding_info = ""
+            if ep.grounding_score is not None:
+                grounding_info = (
+                    f"  Grounding: G={ep.grounding_score:.2f}, "
+                    f"self_loop={ep.self_loop_score:.2f}, "
+                    f"entities={ep.entity_density:.2f}, "
+                    f"causal={ep.causal_density:.2f}, "
+                    f"actionability={ep.actionability:.2f}"
+                )
+
             episode_texts.append(
                 f"--- Turn {ep.id[:8]} (salience={ep.salience:.2f}) ---\n"
                 f"Human: {ep.human_utterance}\n"
@@ -303,6 +401,7 @@ CURRENT LAGRANGIAN PARAMETERS:
                 f"  Vulnerability: {ep.vulnerability_index:.2f}\n"
                 f"  Novelty: {ep.novelty_score:.2f}\n"
                 f"  Layer: {ep.philosophical_layer}\n"
+                f"{grounding_info}\n"
                 f"{markers}"
             )
 
@@ -315,15 +414,32 @@ CURRENT LAGRANGIAN PARAMETERS:
             for i, m in enumerate(meanings, 1):
                 meanings_block += f"  {i}. {m}\n"
 
+        # v0.7: Format limbic trajectory summary
+        limbic_block = ""
+        if limbic_summary:
+            limbic_block = f"""
+
+LIMBIC TRAJECTORY SUMMARY (v0.7 — nervous system affective state):
+  Total interactions: {limbic_summary.get('total_interactions', 0)}
+  Mean dopamine: {limbic_summary.get('mean_dopamine', 0):.3f}
+  Mean serotonin: {limbic_summary.get('mean_serotonin', 0):.3f}
+  Mean grounding: {limbic_summary.get('mean_grounding', 0):.3f}
+  Dopamine trend (start→end): {limbic_summary.get('dopamine_trend', 0):+.3f}
+  Serotonin trend (start→end): {limbic_summary.get('serotonin_trend', 0):+.3f}
+  Mood distribution: {limbic_summary.get('mood_distribution', {})}
+  Crisis events: {limbic_summary.get('crisis_events', 0)}"""
+
         return f"""TODAY'S EPISODES (sorted by salience, descending):
 
 {episodes_block}
 {meanings_block}
+{limbic_block}
 
 Current constitutional distance: D_KL = {kl_divergence:.3f}
 
 Evaluate this day's trajectory. Be rigorous. Be honest.
-Output the full JSON judgment structure as specified."""
+Apply the γ_grounded capacity bound when evaluating İ_c.
+Output the full JSON judgment structure as specified, including the grounding_analysis block."""
 
     def _parse_judgment(
         self, response_text: str, kl_divergence: float
@@ -397,13 +513,30 @@ Output the full JSON judgment structure as specified."""
             rationale=wa.get("rationale", ""),
         )
 
+        # v0.7: Grounding analysis
+        ga = parsed.get("grounding_analysis", {})
+        result.grounding_analysis = GroundingAnalysis(
+            mean_grounding=ga.get("mean_grounding", 0.0),
+            mean_self_loop=ga.get("mean_self_loop", 0.0),
+            grounding_discounted_turns=ga.get("grounding_discounted_turns", []),
+            effective_Ic_integral=ga.get("effective_Ic_integral", result.daily_lagrangian_integral),
+            raw_Ic_integral=ga.get("raw_Ic_integral", result.daily_lagrangian_integral),
+            grounding_penalty_ratio=ga.get("grounding_penalty_ratio", 0.0),
+        )
+
         return result
 
     def _extract_json(self, text: str) -> Optional[dict]:
         """Extract JSON from text, handling various formats."""
+        import re as _re
+
+        # Strip <think>...</think> blocks (DeepSeek R1 reasoning traces)
+        text = _re.sub(r'<think>.*?</think>\s*', '', text, flags=_re.DOTALL)
+        text = _re.sub(r'<think>.*$', '', text, flags=_re.DOTALL)
+
         # Direct parse
         try:
-            return json.loads(text)
+            return json.loads(text.strip())
         except (json.JSONDecodeError, ValueError):
             pass
 
@@ -440,9 +573,18 @@ Output the full JSON judgment structure as specified."""
         """
         Compute blended fertility score: α·S_eth + (1−α)·J_future.
         This determines whether fine-tuning is triggered.
+
+        v0.7: Uses effective_Ic_integral (post γ_grounded discount) instead
+        of the raw daily_lagrangian_integral when grounding discount is enabled.
         """
+        # v0.7: Use grounding-discounted integral when available
+        if self.gamma_discount and judgment.grounding_analysis.effective_Ic_integral != 0.0:
+            lagrangian_value = judgment.grounding_analysis.effective_Ic_integral
+        else:
+            lagrangian_value = judgment.daily_lagrangian_integral
+
         blended = (
-            self.alpha * judgment.daily_lagrangian_integral
+            self.alpha * lagrangian_value
             + (1 - self.alpha) * j_future
         )
         judgment.j_future = j_future

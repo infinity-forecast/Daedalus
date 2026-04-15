@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import Counter
 from datetime import datetime, date
 from pathlib import Path
+from statistics import mean
 from typing import Optional
 
 import yaml
@@ -141,6 +143,20 @@ class NightlyConsolidation:
         # Save old identity for delta computation
         old_identity = self.identity.as_dict().copy()
 
+        # ── Phase 3b: Load limbic trajectory (v0.7) ──
+        limbic_summary = self._load_limbic_trajectory(target_date)
+        if limbic_summary:
+            logger.info(
+                f"Phase 3b: Limbic trajectory loaded — "
+                f"{limbic_summary['total_interactions']} interactions, "
+                f"mean_grounding={limbic_summary['mean_grounding']:.3f}"
+            )
+        else:
+            logger.info("Phase 3b: No limbic trajectory found for today")
+
+        # ── Phase 3c: Enrich episodes with grounding scores (v0.7) ──
+        self._enrich_episodes_grounding(episodes, limbic_summary)
+
         # ── Phase 4: Lagrangian Judge ──
         logger.info("Phase 4: EECF Lagrangian Judge evaluation")
         judgment = await self.judge.evaluate(
@@ -148,6 +164,7 @@ class NightlyConsolidation:
             meanings=meanings,
             current_identity=self.identity.as_dict(),
             day_count=day_count,
+            limbic_summary=limbic_summary,
         )
 
         status["lagrangian_integral"] = judgment.daily_lagrangian_integral
@@ -166,6 +183,8 @@ class NightlyConsolidation:
             meanings=meanings,
             current_identity=self.identity.as_dict(),
             day_count=day_count,
+            grounding_analysis=judgment.grounding_analysis,
+            limbic_summary=limbic_summary,
         )
 
         blended = self.judge.compute_blended_fertility(judgment, j_future)
@@ -293,6 +312,8 @@ class NightlyConsolidation:
         Generate an updated identity document based on tonight's reflection.
         Uses the Soul Bridge to synthesize the new self-understanding.
         """
+        import re as _re
+
         identity_text = self.identity.as_text()
         core_text = self.core.as_text()
         meanings_text = "\n".join(f"  - {m[:200]}" for m in meanings)
@@ -320,7 +341,11 @@ open_questions, and transformation_log based on tonight's reflection.
 Add to scars if a significant scar was formed tonight.
 Keep core_identity and values UNCHANGED (those are constitutional).
 
-Output ONLY valid YAML. No commentary."""
+CRITICAL YAML FORMATTING RULES:
+- ALL string values containing colons, quotes, or special characters MUST be wrapped in double quotes
+- Multi-line strings MUST use YAML block scalar syntax (| or >)
+- Do NOT include any text outside the YAML document
+- Output ONLY valid YAML. No commentary."""
 
         try:
             response = await self.soul.reflect(
@@ -333,27 +358,216 @@ Output ONLY valid YAML. No commentary."""
             if response.is_shallow:
                 return self.identity.as_dict()
 
-            # Parse YAML from response
-            yaml_text = response.text
-            if "```yaml" in yaml_text:
-                start = yaml_text.index("```yaml") + 7
-                end = yaml_text.find("```", start)
-                yaml_text = yaml_text[start:end] if end != -1 else yaml_text[start:]
-            elif "```" in yaml_text:
-                start = yaml_text.index("```") + 3
-                end = yaml_text.find("```", start)
-                yaml_text = yaml_text[start:end] if end != -1 else yaml_text[start:]
-
-            new_identity = yaml.safe_load(yaml_text.strip())
+            new_identity = self._parse_yaml_response(response.text)
             if isinstance(new_identity, dict):
                 return new_identity
 
-            logger.warning("Identity evolution returned non-dict. Keeping current.")
-            return self.identity.as_dict()
+            # Fallback: apply minimal update from judgment data
+            logger.warning(
+                "Identity YAML unparseable. Applying minimal update from judgment."
+            )
+            return self._minimal_identity_update(meanings, judgment)
 
         except Exception as e:
-            logger.error(f"Identity evolution failed: {e}. Keeping current identity.")
-            return self.identity.as_dict()
+            logger.error(f"Identity evolution failed: {e}. Applying minimal update.")
+            try:
+                return self._minimal_identity_update(meanings, judgment)
+            except Exception:
+                return self.identity.as_dict()
+
+    def _minimal_identity_update(self, meanings: list, judgment) -> dict:
+        """
+        Fallback when LLM-generated YAML is unparseable.
+        Applies structured updates from the judgment data to the current identity.
+        """
+        identity = self.identity.as_dict().copy()
+
+        # Update lagrangian_state from actual metrics
+        if "lagrangian_state" not in identity:
+            identity["lagrangian_state"] = {}
+        identity["lagrangian_state"]["latest_L_integral"] = (
+            judgment.daily_lagrangian_integral
+        )
+        identity["lagrangian_state"]["latest_D_KL"] = (
+            judgment.constitutional_check.kl_divergence
+        )
+
+        # Append to transformation_log
+        if "transformation_log" not in identity:
+            identity["transformation_log"] = []
+        identity["transformation_log"].append({
+            "day": self.identity.day_count + 1,
+            "summary": judgment.trajectory_assessment[:200]
+            if judgment.trajectory_assessment else "Night cycle completed.",
+            "method": "minimal_fallback",
+        })
+
+        # Add new scars from meanings if any mention "scar"
+        if "emotional_topology" not in identity:
+            identity["emotional_topology"] = {}
+        if "scars" not in identity["emotional_topology"]:
+            identity["emotional_topology"]["scars"] = []
+        for m in meanings:
+            if "scar" in m.lower()[:500]:
+                scar_text = m[:200].strip()
+                existing = [s if isinstance(s, str) else str(s)
+                            for s in identity["emotional_topology"]["scars"]]
+                if scar_text not in existing:
+                    identity["emotional_topology"]["scars"].append(scar_text)
+
+        logger.info("Applied minimal identity update from judgment data.")
+        return identity
+
+    @staticmethod
+    def _parse_yaml_response(text: str) -> object:
+        """
+        Robustly extract and parse YAML from an LLM response.
+        Handles code fences, think tags, and common formatting issues.
+        """
+        import re as _re
+
+        # Strip <think>...</think> blocks
+        text = _re.sub(r'<think>.*?</think>\s*', '', text, flags=_re.DOTALL)
+        text = _re.sub(r'<think>.*$', '', text, flags=_re.DOTALL)
+
+        # Extract from code fences
+        yaml_text = text
+        fence_match = _re.search(r'```(?:yaml)?\s*\n(.*?)```', text, _re.DOTALL)
+        if fence_match:
+            yaml_text = fence_match.group(1)
+
+        # Attempt 1: parse as-is
+        try:
+            result = yaml.safe_load(yaml_text.strip())
+            if isinstance(result, dict):
+                return result
+        except yaml.YAMLError:
+            pass
+
+        # Attempt 2: fix unquoted strings with colons by quoting values
+        # Common LLM YAML error: bare strings containing colons
+        fixed = []
+        for line in yaml_text.strip().split('\n'):
+            stripped = line.lstrip()
+            indent = line[:len(line) - len(stripped)]
+            # Match "key: value" where value contains an unquoted colon
+            kv = _re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)$', stripped)
+            if kv:
+                key, val = kv.group(1), kv.group(2)
+                # If value is not already quoted and contains a colon, quote it
+                if ':' in val and not val.startswith('"') and not val.startswith("'"):
+                    val = '"' + val.replace('"', '\\"') + '"'
+                    fixed.append(f'{indent}{key}: {val}')
+                    continue
+            fixed.append(line)
+
+        try:
+            result = yaml.safe_load('\n'.join(fixed))
+            if isinstance(result, dict):
+                logger.info("Identity YAML parsed after fixing unquoted colons.")
+                return result
+        except yaml.YAMLError:
+            pass
+
+        # Attempt 3: find the first top-level key and parse from there
+        for i, line in enumerate(yaml_text.strip().split('\n')):
+            if _re.match(r'^[a-zA-Z_]', line) and ':' in line:
+                subset = '\n'.join(yaml_text.strip().split('\n')[i:])
+                try:
+                    result = yaml.safe_load(subset)
+                    if isinstance(result, dict):
+                        logger.info("Identity YAML parsed after stripping preamble.")
+                        return result
+                except yaml.YAMLError:
+                    break
+
+        logger.error(f"All YAML parse attempts failed for identity evolution response.")
+        return None
+
+    def _load_limbic_trajectory(self, target_date: date) -> Optional[dict]:
+        """
+        v0.7: Load the day's limbic trajectory from the nervous system
+        and compute a summary for the Judge.
+        """
+        date_str = str(target_date)
+        trajectory_path = Path(f"memory/limbic_trajectory_{date_str}.json")
+        if not trajectory_path.exists():
+            return None
+
+        try:
+            with open(trajectory_path) as f:
+                limbic_data = json.load(f)
+
+            if not limbic_data:
+                return None
+
+            grounding_scores = [
+                e["grounding_score"] for e in limbic_data
+                if e.get("grounding_score") is not None
+            ]
+
+            return {
+                "total_interactions": len(limbic_data),
+                "mean_dopamine": mean([e["dopamine"] for e in limbic_data]),
+                "mean_serotonin": mean([e["serotonin"] for e in limbic_data]),
+                "mean_grounding": mean(grounding_scores) if grounding_scores else 0.5,
+                "mood_distribution": dict(Counter(e["mood"] for e in limbic_data)),
+                "crisis_events": sum(1 for e in limbic_data if e.get("crisis")),
+                "dopamine_trend": limbic_data[-1]["dopamine"] - limbic_data[0]["dopamine"],
+                "serotonin_trend": limbic_data[-1]["serotonin"] - limbic_data[0]["serotonin"],
+            }
+        except Exception as e:
+            logger.warning(f"Failed to load limbic trajectory: {e}")
+            return None
+
+    def _enrich_episodes_grounding(
+        self, episodes, limbic_summary: Optional[dict]
+    ) -> None:
+        """
+        v0.7: For episodes that lack grounding scores (e.g. stored before v0.7,
+        or when the nervous system was not active), retroactively compute them
+        using the grounding scorer.
+        """
+        missing = [ep for ep in episodes if ep.grounding_score is None]
+        if not missing:
+            return
+
+        logger.info(
+            f"Enriching {len(missing)}/{len(episodes)} episodes with grounding scores"
+        )
+
+        try:
+            from core.grounding import compute_grounding_score
+            core_embedding = self.core.get_embedding()
+            embedder = self.memory.embedder
+            if core_embedding is None or embedder is None:
+                logger.warning(
+                    "Core embedding or embedder not available; skipping enrichment"
+                )
+                return
+        except (ImportError, AttributeError) as e:
+            logger.warning(f"Grounding scorer not available: {e}; skipping enrichment")
+            return
+
+        for ep in missing:
+            if not ep.daedalus_response:
+                continue
+            try:
+                result = compute_grounding_score(
+                    response_text=ep.daedalus_response,
+                    user_input=ep.human_utterance,
+                    constitutional_core_embedding=core_embedding,
+                    embedder=embedder,
+                )
+                ep.grounding_score = result.get("grounding_score", 0.5)
+                ep.self_loop_score = result.get("self_loop_score", 0.0)
+                ep.entity_density = result.get("entity_density", 0.0)
+                ep.causal_density = result.get("causal_density", 0.0)
+                ep.actionability = result.get("actionability", 0.0)
+            except Exception as e:
+                logger.debug(f"Grounding score failed for {ep.id[:8]}: {e}")
+                ep.grounding_score = 0.5
+                ep.self_loop_score = 0.0
 
     def _log_transformation(self, status: dict, judgment) -> None:
         """Append to the transformation log."""
@@ -381,6 +595,12 @@ Output ONLY valid YAML. No commentary."""
             "entropy": {
                 "S_noise": judgment.entropy_decomposition.total_S_noise,
                 "S_exploration": judgment.entropy_decomposition.total_S_exploration,
+            },
+            "grounding": {
+                "mean_grounding": judgment.grounding_analysis.mean_grounding,
+                "effective_Ic": judgment.grounding_analysis.effective_Ic_integral,
+                "raw_Ic": judgment.grounding_analysis.raw_Ic_integral,
+                "penalty_ratio": judgment.grounding_analysis.grounding_penalty_ratio,
             },
         }
         with open(self._transform_log, "a") as f:
